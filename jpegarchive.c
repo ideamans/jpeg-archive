@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include "jpeg-recompress-lib.h"
+#include "jpegarchive.h"
 #include "src/util.h"
 #include "src/edit.h"
 #include "src/iqa/include/iqa.h"
@@ -45,6 +45,10 @@ void jpeg_recompress(const char *input_path, const char *output_path, int qualit
     // Initialize progname for error handling
     extern const char *progname;
     progname = "jpeg-recompress-lib";
+    
+    // Variables for metadata
+    unsigned char *metaBuf = NULL;
+    unsigned int metaSize = 0;
 
     // Validate quality preset
     if (quality_preset < JPEG_RECOMPRESS_QUALITY_LOW || quality_preset > JPEG_RECOMPRESS_QUALITY_VERYHIGH) {
@@ -129,10 +133,9 @@ void jpeg_recompress(const char *input_path, const char *output_path, int qualit
         return;
     }
 
-    // Check for existing jpeg-recompress comment
+    // Check for existing jpeg-recompress comment and read metadata
     if (inputFiletype == FILETYPE_JPEG) {
-        unsigned char *metaBuf;
-        unsigned int metaSize;
+        // First try to get metadata with comment check
         if (getMetadata(buf, bufSize, &metaBuf, &metaSize, "Compressed by jpeg-recompress")) {
             // File already processed
             if (copyFiles) {
@@ -162,6 +165,9 @@ void jpeg_recompress(const char *input_path, const char *output_path, int qualit
                 result->error = strdup("File already processed by jpeg-recompress");
                 return;
             }
+        } else {
+            // File not already processed, get all metadata
+            getMetadata(buf, bufSize, &metaBuf, &metaSize, NULL);
         }
     }
 
@@ -305,13 +311,8 @@ void jpeg_recompress(const char *input_path, const char *output_path, int qualit
     fwrite(comment, strlen(comment), 1, out);
 
     // Write metadata if preserving and input was JPEG
-    if (!strip && inputFiletype == FILETYPE_JPEG) {
-        unsigned char *metaBuf;
-        unsigned int metaSize;
-        if (getMetadata(buf, bufSize, &metaBuf, &metaSize, comment)) {
-            fwrite(metaBuf, metaSize, 1, out);
-            free(metaBuf);
-        }
+    if (!strip && inputFiletype == FILETYPE_JPEG && metaSize > 0) {
+        fwrite(metaBuf, metaSize, 1, out);
     }
 
     // Write remaining image data
@@ -323,6 +324,9 @@ void jpeg_recompress(const char *input_path, const char *output_path, int qualit
     free(original);
     free(originalGray);
     free(compressed);
+    if (metaBuf) {
+        free(metaBuf);
+    }
 
     // Set success result
     result->exit_code = 0;

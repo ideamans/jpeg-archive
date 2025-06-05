@@ -47,13 +47,13 @@ jpeg-compare: jpeg-compare.c src/util.o src/hash.o src/edit.o src/smallfry.o $(L
 jpeg-hash: jpeg-hash.c src/util.o src/hash.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBJPEG) $(LDFLAGS)
 
-jpeg-recompress-lib.o: jpeg-recompress-lib.c jpeg-recompress-lib.h
+jpegarchive.o: jpegarchive.c jpegarchive.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-libjpegarchive.a: jpeg-recompress-lib.o src/util.o src/edit.o src/smallfry.o $(LIBIQA)
+libjpegarchive.a: jpegarchive.o src/util.o src/edit.o src/smallfry.o $(LIBIQA)
 	mkdir -p tmp
 	cd tmp && ar x ../$(LIBIQA)
-	ar rcs $@ jpeg-recompress-lib.o src/util.o src/edit.o src/smallfry.o tmp/*.o
+	ar rcs $@ jpegarchive.o src/util.o src/edit.o src/smallfry.o tmp/*.o
 	rm -rf tmp
 
 %.o: %.c %.h
@@ -78,6 +78,6 @@ test-memory-leaking: libjpegarchive.a jpeg-recompress
 	cd golang && valgrind --leak-check=full --show-leak-kinds=all go test -run TestMemoryLeak
 
 clean:
-	rm -rf jpeg-recompress jpeg-compare jpeg-hash test/test src/*.o src/iqa/build jpeg-recompress-lib.o libjpegarchive.a tmp/
+	rm -rf jpeg-recompress jpeg-compare jpeg-hash test/test src/*.o src/iqa/build jpegarchive.o libjpegarchive.a tmp/
 
 .PHONY: test test-lib test-memory-leaking install clean

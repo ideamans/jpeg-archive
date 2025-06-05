@@ -34,9 +34,15 @@ func TestCompareWithOriginalTool(t *testing.T) {
 	}
 	t.Logf("Test file: %s", testFile)
 
+	// Create tmp directory for outputs
+	tmpDir := "tmp"
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		t.Fatalf("Failed to create tmp directory: %v", err)
+	}
+
 	// Test with medium quality
-	libOutput := filepath.Join(t.TempDir(), "lib_output.jpg")
-	cmdOutput := filepath.Join(t.TempDir(), "cmd_output.jpg")
+	libOutput := filepath.Join(tmpDir, "lib_output.jpg")
+	cmdOutput := filepath.Join(tmpDir, "cmd_output.jpg")
 
 	// Use library
 	libResult, err := jpegarchive.JpegRecompress(testFile, libOutput, jpegarchive.QualityMedium)
@@ -64,8 +70,8 @@ func TestCompareWithOriginalTool(t *testing.T) {
 		sizeDiff = -sizeDiff
 	}
 
-	t.Logf("Library output size: %d bytes", libSize)
-	t.Logf("Command output size: %d bytes", cmdSize)
+	t.Logf("Library output: %s (size: %d bytes)", libOutput, libSize)
+	t.Logf("Command output: %s (size: %d bytes)", cmdOutput, cmdSize)
 	t.Logf("Size difference: %.2f%%", sizeDiff)
 	t.Logf("Library SSIM: %f, Quality: %d", libResult.SSIM, libResult.Quality)
 
@@ -78,8 +84,14 @@ func TestCompareWithOriginalTool(t *testing.T) {
 func TestMemoryLeak(t *testing.T) {
 	testFile := getTestImage(t)
 
+	// Create tmp directory for outputs
+	tmpDir := "tmp"
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		t.Fatalf("Failed to create tmp directory: %v", err)
+	}
+
 	// Create memory profile
-	memFile, err := os.Create("mem.prof")
+	memFile, err := os.Create(filepath.Join(tmpDir, "mem.prof"))
 	if err != nil {
 		t.Fatal("could not create memory profile: ", err)
 	}

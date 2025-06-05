@@ -3,7 +3,7 @@ package jpegarchive
 // #cgo CFLAGS: -I../ -I../src/iqa/include
 // #cgo LDFLAGS: -L../ -l:libjpegarchive.a -L/opt/mozjpeg/lib -L/opt/mozjpeg/lib64 -L/usr/local/opt/mozjpeg/lib -l:libjpeg.a -lm
 // #include <stdlib.h>
-// #include "jpeg-recompress-lib.h"
+// #include "jpegarchive.h"
 import "C"
 import (
 	"fmt"
