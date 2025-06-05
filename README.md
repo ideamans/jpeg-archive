@@ -1,4 +1,4 @@
-JPEG Archive [![Build Status](http://img.shields.io/travis/danielgtaylor/jpeg-archive.svg?style=flat)](https://travis-ci.org/danielgtaylor/jpeg-archive) [![Build status](https://ci.appveyor.com/api/projects/status/1p7hrrq380xuqlyh?svg=true)](https://ci.appveyor.com/project/danielgtaylor/jpeg-archive) [![Version](http://img.shields.io/badge/version-2.2.0-blue.svg?style=flat)](https://github.com/danielgtaylor/jpeg-archive/releases) [![License](http://img.shields.io/badge/license-MIT-red.svg?style=flat)](http://dgt.mit-license.org/)
+JPEG Archive [![Build Status](http://img.shields.io/travis/danielgtaylor/jpeg-archive.svg?style=flat)](https://travis-ci.org/danielgtaylor/jpeg-archive) [![Build status](https://ci.appveyor.com/api/projects/status/1p7hrrq380xuqlyh?svg=true)](https://ci.appveyor.com/project/danielgtaylor/jpeg-archive) [![Version](http://img.shields.io/badge/version-2.2.0-blue.svg?style=flat)](https://github.com/ideamans/jpeg-archive/releases) [![License](http://img.shields.io/badge/license-MIT-red.svg?style=flat)](http://dgt.mit-license.org/)
 ============
 Utilities for archiving photos for saving to long term storage or serving over the web. The goals are:
 
@@ -16,9 +16,9 @@ Contributions to this project are very welcome.
 
 Download
 --------
-You can download the latest source and binary releases from the [JPEG Archive releases page](https://github.com/danielgtaylor/jpeg-archive/releases). Windows binaries for the latest commit are available from the [Windows CI build server](https://ci.appveyor.com/project/danielgtaylor/jpeg-archive/build/artifacts).
+You can download the latest source and binary releases from the [JPEG Archive releases page](https://github.com/ideamans/jpeg-archive/releases). Windows binaries for the latest commit are available from the [Windows CI build server](https://ci.appveyor.com/project/danielgtaylor/jpeg-archive/build/artifacts).
 
-If you are looking for an easy way to run these utilities in parallel over many files to utilize all CPU cores, please also download [Ladon](https://github.com/danielgtaylor/ladon) or [GNU Parallel](https://www.gnu.org/software/parallel/). You can then use the `jpeg-archive` command below or use `ladon` directly. Example:
+If you are looking for an easy way to run these utilities in parallel over many files to utilize all CPU cores, please also download [Ladon](https://github.com/ideamans/ladon) or [GNU Parallel](https://www.gnu.org/software/parallel/). You can then use the `jpeg-archive` command below or use `ladon` directly. Example:
 
 ```bash
 # Re-compress JPEGs and replace the originals
@@ -36,7 +36,7 @@ The following utilities are part of this project. All of them accept a `--help` 
 Compress RAW and JPEG files in a folder utilizing all CPU cores. This is a simple shell script that uses the utilities below. It requires:
 
 * a POSIX-compatible shell such as Bash
-* [Ladon](https://github.com/danielgtaylor/ladon) or [GNU Parallel](https://www.gnu.org/software/parallel/)
+* [Ladon](https://github.com/ideamans/ladon) or [GNU Parallel](https://www.gnu.org/software/parallel/)
 * [dcraw](http://www.cybercom.net/~dcoffin/dcraw/)
 * [exiftool](http://www.sno.phy.queensu.ca/~phil/exiftool/)
 * jpeg-recompress (part of this project)
@@ -79,7 +79,7 @@ SmallFry | `-m smallfry` | Linear-weighted BBCQ-like ([original project](https:/
 **Note**: The SmallFry algorithm may be [patented](http://www.jpegmini.com/main/technology) so use with caution.
 
 #### Subsampling
-The JPEG format allows for subsampling of the color channels to save space. For each 2x2 block of pixels per color channel (four pixels total) it can store four pixels (all of them), two pixels or a single pixel. By default, the JPEG encoder subsamples the non-luma channels to two pixels (often referred to as 4:2:0 subsampling). Most digital cameras do the same because of limitations in the human eye. This may lead to unintended behavior for specific use cases (see [#12](https://github.com/danielgtaylor/jpeg-archive/issues/12) for an example), so you can use `--subsample disable` to disable this subsampling.
+The JPEG format allows for subsampling of the color channels to save space. For each 2x2 block of pixels per color channel (four pixels total) it can store four pixels (all of them), two pixels or a single pixel. By default, the JPEG encoder subsamples the non-luma channels to two pixels (often referred to as 4:2:0 subsampling). Most digital cameras do the same because of limitations in the human eye. This may lead to unintended behavior for specific use cases (see [#12](https://github.com/ideamans/jpeg-archive/issues/12) for an example), so you can use `--subsample disable` to disable this subsampling.
 
 #### Example Commands
 
@@ -165,7 +165,7 @@ brew install mozjpeg
 
 ```bash
 pkg install mozjpeg
-git clone https://github.com/danielgtaylor/jpeg-archive.git
+git clone https://github.com/ideamans/jpeg-archive.git
 cd jpeg-archive/
 gmake
 sudo gmake install
@@ -195,7 +195,7 @@ mingw32-make
 cd ..
 
 # Build jpeg-archive
-git clone https://github.com/danielgtaylor/jpeg-archive
+git clone https://github.com/ideamans/jpeg-archive
 cd jpeg-archive
 CC=gcc mingw32-make
 ```

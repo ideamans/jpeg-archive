@@ -10,3 +10,7 @@ comparison
 comparison.png
 test/test.jpg
 test/test
+*.o
+*.a
+*.prof
+golang/tmp
