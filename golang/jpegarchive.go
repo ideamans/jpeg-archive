@@ -1,7 +1,17 @@
 package jpegarchive
 
-// #cgo CFLAGS: -I../ -I../src/iqa/include
-// #cgo LDFLAGS: -L../ -l:libjpegarchive.a -L/opt/mozjpeg/lib -L/opt/mozjpeg/lib64 -L/usr/local/opt/mozjpeg/lib -l:libjpeg.a -lm
+// #cgo CFLAGS: -I../ -I../src/iqa/include -std=c99
+// #cgo linux CFLAGS: -I/opt/mozjpeg/include
+// #cgo darwin CFLAGS: -I/usr/local/opt/mozjpeg/include
+// #cgo freebsd CFLAGS: -I/usr/local/include/mozjpeg
+// #cgo windows CFLAGS: -I../mozjpeg
+//
+// #cgo LDFLAGS: -L../ -l:libjpegarchive.a -lm
+// #cgo linux LDFLAGS: -L/opt/mozjpeg/lib -L/opt/mozjpeg/lib64 -l:libjpeg.a
+// #cgo darwin LDFLAGS: -L/usr/local/opt/mozjpeg/lib -l:libjpeg.a
+// #cgo freebsd LDFLAGS: -L/usr/local/lib/mozjpeg -ljpeg
+// #cgo windows LDFLAGS: -L../mozjpeg -l:libjpeg.a
+//
 // #include <stdlib.h>
 // #include "jpegarchive.h"
 import "C"
