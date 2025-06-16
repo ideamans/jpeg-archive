@@ -110,45 +110,77 @@ jobs:
             ~/Library/Caches/Homebrew
             /usr/local/Cellar/cmake@3
             /usr/local/Cellar/nasm
-            /opt/homebrew/Cellar/libpng
-            /usr/local/Cellar/libpng
-          key: ${{ runner.os }}-brew-${{ hashFiles('.github/.macos/cmake.rb', '.github/.macos/libpng.rb') }}-v3
+          key: ${{ runner.os }}-brew-${{ hashFiles('.github/.macos/cmake.rb') }}-v4
           restore-keys: |
             ${{ runner.os }}-brew-
+
+      - name: Cache libpng
+        id: cache-libpng
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/opt/libpng
+          key: ${{ runner.os }}-${{ matrix.platform }}-libpng-1.6.43
+
+      - name: Build libpng from source
+        if: steps.cache-libpng.outputs.cache-hit != 'true'
+        run: |
+          # Download and build libpng 1.6.43
+          curl -L https://github.com/pnggroup/libpng/archive/v1.6.43.tar.gz -o libpng.tar.gz
+          tar xzf libpng.tar.gz
+          cd libpng-1.6.43
+          mkdir build && cd build
+          cmake -DCMAKE_INSTALL_PREFIX=/usr/local/opt/libpng ..
+          make -j$(sysctl -n hw.ncpu)
+          sudo make install
 
       - name: Cache mozjpeg
         id: cache-mozjpeg
         uses: actions/cache@v4
         with:
           path: /usr/local/opt/mozjpeg
-          key: ${{ runner.os }}-${{ matrix.platform }}-mozjpeg-v4.1.5
+          key: ${{ runner.os }}-${{ matrix.platform }}-mozjpeg-v4.1.5-libpng1.6
 
       - name: Install dependencies
         run: |
+          # Remove system libpng if exists
+          brew uninstall --ignore-dependencies libpng || true
+          
           # Install cmake@3 from custom formula (use full path)
           brew install ${GITHUB_WORKSPACE}/.github/.macos/cmake.rb || true
-          # Install libpng from custom formula
-          brew install ${GITHUB_WORKSPACE}/.github/.macos/libpng.rb || true
           brew install nasm || true
+          
+          # Add libpng to PKG_CONFIG_PATH and other environment variables
+          echo "PKG_CONFIG_PATH=/usr/local/opt/libpng/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "LDFLAGS=-L/usr/local/opt/libpng/lib" >> $GITHUB_ENV
+          echo "CPPFLAGS=-I/usr/local/opt/libpng/include" >> $GITHUB_ENV
 
       - name: Build mozjpeg
         if: steps.cache-mozjpeg.outputs.cache-hit != 'true'
         run: |
+          # Set PKG_CONFIG_PATH for libpng
+          export PKG_CONFIG_PATH="/usr/local/opt/libpng/lib/pkgconfig:$PKG_CONFIG_PATH"
+          export CMAKE_PREFIX_PATH="/usr/local/opt/libpng:$CMAKE_PREFIX_PATH"
+          
           # Install mozjpeg
           git clone https://github.com/mozilla/mozjpeg.git
           cd mozjpeg
           git checkout v4.1.5
           mkdir build && cd build
           if [ "${{ matrix.platform }}" = "arm64" ]; then
-            cmake -G"Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/usr/local/opt/mozjpeg -DCMAKE_OSX_ARCHITECTURES=arm64 ..
+            cmake -G"Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/usr/local/opt/mozjpeg -DCMAKE_OSX_ARCHITECTURES=arm64 -DPNG_PNG_INCLUDE_DIR=/usr/local/opt/libpng/include -DPNG_LIBRARY=/usr/local/opt/libpng/lib/libpng.dylib ..
           else
-            cmake -G"Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/usr/local/opt/mozjpeg -DCMAKE_OSX_ARCHITECTURES=x86_64 ..
+            cmake -G"Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/usr/local/opt/mozjpeg -DCMAKE_OSX_ARCHITECTURES=x86_64 -DPNG_PNG_INCLUDE_DIR=/usr/local/opt/libpng/include -DPNG_LIBRARY=/usr/local/opt/libpng/lib/libpng.dylib ..
           fi
           make -j$(sysctl -n hw.ncpu)
           sudo make install
 
       - name: Build
         run: |
+          # Ensure custom libpng is used
+          export PKG_CONFIG_PATH="/usr/local/opt/libpng/lib/pkgconfig:$PKG_CONFIG_PATH"
+          export LDFLAGS="-L/usr/local/opt/libpng/lib"
+          export CPPFLAGS="-I/usr/local/opt/libpng/include"
+          
           make clean
           make all
           make libjpegarchive.a
