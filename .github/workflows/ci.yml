@@ -23,16 +23,37 @@ jobs:
         with:
           go-version: "1.22"
 
-      - name: Install mozjpeg
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Cache mozjpeg
+        id: cache-mozjpeg
+        uses: actions/cache@v4
+        with:
+          path: /opt/mozjpeg
+          key: ${{ runner.os }}-mozjpeg-v4.1.5
+
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake nasm libpng-dev
+
+      - name: Build mozjpeg
+        if: steps.cache-mozjpeg.outputs.cache-hit != 'true'
+        run: |
           git clone https://github.com/mozilla/mozjpeg.git
           cd mozjpeg
           git checkout v4.1.5
           mkdir build && cd build
           cmake -G"Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/opt/mozjpeg ..
-          make
+          make -j$(nproc)
           sudo make install
 
       - name: Build
@@ -72,13 +93,43 @@ jobs:
         with:
           go-version: "1.22"
 
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Cache Homebrew packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/Homebrew
+            /usr/local/Cellar/cmake@3
+            /usr/local/Cellar/nasm
+            /usr/local/Cellar/libpng
+          key: ${{ runner.os }}-brew-${{ hashFiles('.github/.macos/cmake@3.rb') }}
+          restore-keys: |
+            ${{ runner.os }}-brew-
+
+      - name: Cache mozjpeg
+        id: cache-mozjpeg
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/opt/mozjpeg
+          key: ${{ runner.os }}-${{ matrix.platform }}-mozjpeg-v4.1.5
+
       - name: Install dependencies
         run: |
           # Install cmake@3 from custom formula (use full path)
-          brew install ${GITHUB_WORKSPACE}/.github/.macos/cmake@3.rb
-          brew install nasm libpng
+          brew install ${GITHUB_WORKSPACE}/.github/.macos/cmake@3.rb || true
+          brew install nasm libpng || true
           
       - name: Build mozjpeg
+        if: steps.cache-mozjpeg.outputs.cache-hit != 'true'
         run: |
           # Install mozjpeg
           git clone https://github.com/mozilla/mozjpeg.git
@@ -90,7 +141,7 @@ jobs:
           else
             cmake -G"Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/usr/local/opt/mozjpeg -DCMAKE_OSX_ARCHITECTURES=x86_64 ..
           fi
-          make
+          make -j$(sysctl -n hw.ncpu)
           sudo make install
 
       - name: Build
@@ -138,6 +189,17 @@ jobs:
             mingw-w64-x86_64-libpng
             git
             unzip
+          cache: true
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
       - name: Cache CMake
         id: cache-cmake
@@ -166,7 +228,15 @@ jobs:
           # Verify cmake version
           cmake --version
 
+      - name: Cache mozjpeg
+        id: cache-mozjpeg
+        uses: actions/cache@v4
+        with:
+          path: ../mozjpeg
+          key: ${{ runner.os }}-mozjpeg-v4.1.5-built
+
       - name: Build mozjpeg
+        if: steps.cache-mozjpeg.outputs.cache-hit != 'true'
         run: |
           export PATH="/usr/local/cmake/bin:$PATH"
           git clone https://github.com/mozilla/mozjpeg.git ../mozjpeg
@@ -174,7 +244,7 @@ jobs:
           git checkout v4.1.5
           mkdir build && cd build
           cmake -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=../install ..
-          make
+          make -j$(nproc)
           make install
           # Create static library in expected location
           cp ../install/lib/libjpeg.a ../libjpeg.a
