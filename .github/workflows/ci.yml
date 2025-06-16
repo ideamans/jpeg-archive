@@ -26,7 +26,7 @@ jobs:
       - name: Install mozjpeg
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake nasm
+          sudo apt-get install -y cmake nasm libpng-dev
           git clone https://github.com/mozilla/mozjpeg.git
           cd mozjpeg
           git checkout v4.1.5
@@ -74,9 +74,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Install cmake@3 from custom formula
-          brew install .github/.macos/cmake@3.rb
-          brew install nasm
+          # Install cmake@3 from custom formula (use full path)
+          brew install ${GITHUB_WORKSPACE}/.github/.macos/cmake@3.rb
+          brew install nasm libpng
           
       - name: Build mozjpeg
         run: |
@@ -133,13 +133,42 @@ jobs:
           install: |
             base-devel
             mingw-w64-x86_64-toolchain
-            mingw-w64-x86_64-cmake
             mingw-w64-x86_64-nasm
             mingw-w64-x86_64-go
+            mingw-w64-x86_64-libpng
             git
+            unzip
+
+      - name: Cache CMake
+        id: cache-cmake
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/cmake
+          key: ${{ runner.os }}-cmake-3.30.5
+
+      - name: Install cmake version 3
+        if: steps.cache-cmake.outputs.cache-hit != 'true'
+        run: |
+          # Remove any existing cmake package
+          pacman -R --noconfirm mingw-w64-x86_64-cmake || true
+          # Download and install cmake 3.30.5 (latest version 3.x)
+          curl -L https://github.com/Kitware/CMake/releases/download/v3.30.5/cmake-3.30.5-windows-x86_64.zip -o cmake.zip
+          unzip -q cmake.zip
+          # Move cmake to a permanent location
+          mkdir -p /usr/local
+          mv cmake-3.30.5-windows-x86_64 /usr/local/cmake
+
+      - name: Setup cmake PATH
+        run: |
+          # Add cmake to PATH
+          echo 'export PATH="/usr/local/cmake/bin:$PATH"' >> ~/.bashrc
+          export PATH="/usr/local/cmake/bin:$PATH"
+          # Verify cmake version
+          cmake --version
 
       - name: Build mozjpeg
         run: |
+          export PATH="/usr/local/cmake/bin:$PATH"
           git clone https://github.com/mozilla/mozjpeg.git ../mozjpeg
           cd ../mozjpeg
           git checkout v4.1.5
@@ -152,12 +181,14 @@ jobs:
 
       - name: Build
         run: |
+          export PATH="/usr/local/cmake/bin:$PATH"
           make clean
           make all
           make libjpegarchive.a
 
       - name: Run tests
         run: |
+          export PATH="/usr/local/cmake/bin:$PATH"
           make test
           make test-lib
 
