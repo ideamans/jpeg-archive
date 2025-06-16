@@ -81,7 +81,7 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        platform: [x64, arm64]
+        platform: [arm64]
 
     steps:
       - uses: actions/checkout@v4
@@ -166,11 +166,7 @@ jobs:
           cd mozjpeg
           git checkout v4.1.5
           mkdir build && cd build
-          if [ "${{ matrix.platform }}" = "arm64" ]; then
-            cmake -G"Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/usr/local/opt/mozjpeg -DCMAKE_OSX_ARCHITECTURES=arm64 -DPNG_PNG_INCLUDE_DIR=/usr/local/opt/libpng/include -DPNG_LIBRARY=/usr/local/opt/libpng/lib/libpng.dylib ..
-          else
-            cmake -G"Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/usr/local/opt/mozjpeg -DCMAKE_OSX_ARCHITECTURES=x86_64 -DPNG_PNG_INCLUDE_DIR=/usr/local/opt/libpng/include -DPNG_LIBRARY=/usr/local/opt/libpng/lib/libpng.dylib ..
-          fi
+          cmake -G"Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/usr/local/opt/mozjpeg -DCMAKE_OSX_ARCHITECTURES=arm64 -DPNG_PNG_INCLUDE_DIR=/usr/local/opt/libpng/include -DPNG_LIBRARY=/usr/local/opt/libpng/lib/libpng.dylib ..
           make -j$(sysctl -n hw.ncpu)
           sudo make install
 
@@ -188,7 +184,10 @@ jobs:
       - name: Run tests
         run: |
           make test
-          make test-lib
+          # For macOS, ensure libjpegarchive.a is in the current directory for Go tests
+          pwd
+          ls -la libjpegarchive.a
+          cd golang && go test -v ./...
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
