@@ -6,11 +6,10 @@ package jpegarchive
 // #cgo freebsd CFLAGS: -I/usr/local/include/mozjpeg
 // #cgo windows CFLAGS: -I../mozjpeg
 //
-// #cgo LDFLAGS: -L../ -l:libjpegarchive.a -lm
-// #cgo linux LDFLAGS: -L/opt/mozjpeg/lib -L/opt/mozjpeg/lib64 -l:libjpeg.a
-// #cgo darwin LDFLAGS: -L/usr/local/opt/mozjpeg/lib -l:libjpeg.a
-// #cgo freebsd LDFLAGS: -L/usr/local/lib/mozjpeg -ljpeg
-// #cgo windows LDFLAGS: -L../mozjpeg -l:libjpeg.a
+// #cgo linux LDFLAGS: -L../ -l:libjpegarchive.a -L/opt/mozjpeg/lib -L/opt/mozjpeg/lib64 -l:libjpeg.a -lm
+// #cgo darwin LDFLAGS: -L../ -ljpegarchive -L/usr/local/opt/mozjpeg/lib -ljpeg -lm
+// #cgo freebsd LDFLAGS: -L../ -l:libjpegarchive.a -L/usr/local/lib/mozjpeg -ljpeg -lm
+// #cgo windows LDFLAGS: -L../ -l:libjpegarchive.a -L../../mozjpeg -l:libjpeg.a -lm
 //
 // #include <stdlib.h>
 // #include "jpegarchive.h"

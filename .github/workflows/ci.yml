@@ -184,9 +184,7 @@ jobs:
       - name: Run tests
         run: |
           make test
-          # For macOS, set CGO_LDFLAGS to use absolute paths
-          export CGO_LDFLAGS="-L${PWD} ${PWD}/libjpegarchive.a -L/usr/local/opt/mozjpeg/lib /usr/local/opt/mozjpeg/lib/libjpeg.a -lm"
-          cd golang && go test -v ./...
+          make test-lib
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -307,8 +305,7 @@ jobs:
         run: |
           export PATH="/usr/local/cmake/bin:$PATH"
           make test
-          # For Windows Go tests, ensure the library paths are correct
-          cd golang && go test -v ./...
+          make test-lib
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
