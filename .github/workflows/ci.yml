@@ -1,0 +1,206 @@
+name: CI Tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [x64]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Install mozjpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake nasm
+          git clone https://github.com/mozilla/mozjpeg.git
+          cd mozjpeg
+          git checkout v4.1.5
+          mkdir build && cd build
+          cmake -G"Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/opt/mozjpeg ..
+          make
+          sudo make install
+
+      - name: Build
+        run: |
+          make clean
+          make all
+          make libjpegarchive.a
+
+      - name: Run tests
+        run: |
+          make test
+          make test-lib
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.platform }}-binaries
+          path: |
+            jpeg-recompress
+            jpeg-compare
+            jpeg-hash
+            libjpegarchive.a
+
+  test-macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        platform: [x64, arm64]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Install dependencies
+        run: |
+          # Install cmake@3 from custom formula
+          brew install .github/.macos/cmake@3.rb
+          brew install nasm
+          
+      - name: Build mozjpeg
+        run: |
+          # Install mozjpeg
+          git clone https://github.com/mozilla/mozjpeg.git
+          cd mozjpeg
+          git checkout v4.1.5
+          mkdir build && cd build
+          if [ "${{ matrix.platform }}" = "arm64" ]; then
+            cmake -G"Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/usr/local/opt/mozjpeg -DCMAKE_OSX_ARCHITECTURES=arm64 ..
+          else
+            cmake -G"Unix Makefiles" -DCMAKE_INSTALL_PREFIX=/usr/local/opt/mozjpeg -DCMAKE_OSX_ARCHITECTURES=x86_64 ..
+          fi
+          make
+          sudo make install
+
+      - name: Build
+        run: |
+          make clean
+          make all
+          make libjpegarchive.a
+
+      - name: Run tests
+        run: |
+          make test
+          make test-lib
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.platform }}-binaries
+          path: |
+            jpeg-recompress
+            jpeg-compare
+            jpeg-hash
+            libjpegarchive.a
+
+  test-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: |
+            base-devel
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-nasm
+            mingw-w64-x86_64-go
+            git
+
+      - name: Build mozjpeg
+        run: |
+          git clone https://github.com/mozilla/mozjpeg.git ../mozjpeg
+          cd ../mozjpeg
+          git checkout v4.1.5
+          mkdir build && cd build
+          cmake -G"MSYS Makefiles" -DCMAKE_INSTALL_PREFIX=../install ..
+          make
+          make install
+          # Create static library in expected location
+          cp ../install/lib/libjpeg.a ../libjpeg.a
+
+      - name: Build
+        run: |
+          make clean
+          make all
+          make libjpegarchive.a
+
+      - name: Run tests
+        run: |
+          make test
+          make test-lib
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-binaries
+          path: |
+            jpeg-recompress.exe
+            jpeg-compare.exe
+            jpeg-hash.exe
+            libjpegarchive.a
+
+  release:
+    needs: [test-linux, test-macos, test-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Get version
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Prepare release assets
+        run: |
+          # Create versioned archives for each platform
+          for platform in linux-x64 macos-x64 macos-arm64 windows-x64; do
+            if [ -d "${platform}-binaries" ]; then
+              tar czf "jpeg-archive-${{ steps.get_version.outputs.VERSION }}-${platform}.tar.gz" -C "${platform}-binaries" .
+            fi
+          done
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: JPEG Archive ${{ steps.get_version.outputs.VERSION }}
+          files: |
+            jpeg-archive-${{ steps.get_version.outputs.VERSION }}-*.tar.gz
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
