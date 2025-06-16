@@ -184,9 +184,8 @@ jobs:
       - name: Run tests
         run: |
           make test
-          # For macOS, ensure libjpegarchive.a is in the current directory for Go tests
-          pwd
-          ls -la libjpegarchive.a
+          # For macOS, set CGO_LDFLAGS to use absolute paths
+          export CGO_LDFLAGS="-L${PWD} ${PWD}/libjpegarchive.a -L/usr/local/opt/mozjpeg/lib /usr/local/opt/mozjpeg/lib/libjpeg.a -lm"
           cd golang && go test -v ./...
 
       - name: Upload artifacts
