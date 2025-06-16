@@ -112,7 +112,7 @@ jobs:
             /usr/local/Cellar/nasm
             /opt/homebrew/Cellar/libpng
             /usr/local/Cellar/libpng
-          key: ${{ runner.os }}-brew-${{ hashFiles('.github/.macos/cmake.rb') }}-v2
+          key: ${{ runner.os }}-brew-${{ hashFiles('.github/.macos/cmake.rb', '.github/.macos/libpng.rb') }}-v3
           restore-keys: |
             ${{ runner.os }}-brew-
 
@@ -125,14 +125,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Update Homebrew and upgrade libpng if needed
-          brew update
-          brew upgrade libpng || true
           # Install cmake@3 from custom formula (use full path)
           brew install ${GITHUB_WORKSPACE}/.github/.macos/cmake.rb || true
+          # Install libpng from custom formula
+          brew install ${GITHUB_WORKSPACE}/.github/.macos/libpng.rb || true
           brew install nasm || true
-          # Ensure we have libpng >= 1.6
-          brew list libpng || brew install libpng
 
       - name: Build mozjpeg
         if: steps.cache-mozjpeg.outputs.cache-hit != 'true'
@@ -264,6 +261,10 @@ jobs:
           if [ -f ../mozjpeg/install/include/jconfig.h ]; then
             cp ../mozjpeg/install/include/jconfig.h ../mozjpeg/
           fi
+          # Ensure libjpeg.a is in the expected location for Go tests
+          if [ ! -f ../mozjpeg/libjpeg.a ] && [ -f ../mozjpeg/install/lib/libjpeg.a ]; then
+            cp ../mozjpeg/install/lib/libjpeg.a ../mozjpeg/libjpeg.a
+          fi
 
       - name: Build
         run: |
@@ -276,7 +277,8 @@ jobs:
         run: |
           export PATH="/usr/local/cmake/bin:$PATH"
           make test
-          make test-lib
+          # For Windows Go tests, ensure the library paths are correct
+          cd golang && go test -v ./...
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
