@@ -110,8 +110,9 @@ jobs:
             ~/Library/Caches/Homebrew
             /usr/local/Cellar/cmake@3
             /usr/local/Cellar/nasm
+            /opt/homebrew/Cellar/libpng
             /usr/local/Cellar/libpng
-          key: ${{ runner.os }}-brew-${{ hashFiles('.github/.macos/cmake@3.rb') }}
+          key: ${{ runner.os }}-brew-${{ hashFiles('.github/.macos/cmake.rb') }}-v2
           restore-keys: |
             ${{ runner.os }}-brew-
 
@@ -124,10 +125,15 @@ jobs:
 
       - name: Install dependencies
         run: |
+          # Update Homebrew and upgrade libpng if needed
+          brew update
+          brew upgrade libpng || true
           # Install cmake@3 from custom formula (use full path)
-          brew install ${GITHUB_WORKSPACE}/.github/.macos/cmake@3.rb || true
-          brew install nasm libpng || true
-          
+          brew install ${GITHUB_WORKSPACE}/.github/.macos/cmake.rb || true
+          brew install nasm || true
+          # Ensure we have libpng >= 1.6
+          brew list libpng || brew install libpng
+
       - name: Build mozjpeg
         if: steps.cache-mozjpeg.outputs.cache-hit != 'true'
         run: |
@@ -248,6 +254,16 @@ jobs:
           make install
           # Create static library in expected location
           cp ../install/lib/libjpeg.a ../libjpeg.a
+
+      - name: Setup mozjpeg includes
+        run: |
+          # Copy jconfig.h and other generated headers to source directory
+          if [ -f ../mozjpeg/build/jconfig.h ]; then
+            cp ../mozjpeg/build/jconfig.h ../mozjpeg/
+          fi
+          if [ -f ../mozjpeg/install/include/jconfig.h ]; then
+            cp ../mozjpeg/install/include/jconfig.h ../mozjpeg/
+          fi
 
       - name: Build
         run: |
