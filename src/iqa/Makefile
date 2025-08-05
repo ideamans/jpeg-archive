@@ -37,5 +37,5 @@ clean:
 	cd test; $(MAKE) clean;
 
 .PHONY : test
-test:
+test: $(OUT)
 	cd test; $(MAKE);
