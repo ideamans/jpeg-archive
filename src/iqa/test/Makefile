@@ -8,7 +8,8 @@ SRC= \
 	$(SRCDIR)/test_mse.c \
 	$(SRCDIR)/test_psnr.c \
 	$(SRCDIR)/test_ssim.c \
-	$(SRCDIR)/test_ms_ssim.c
+	$(SRCDIR)/test_ms_ssim.c \
+	$(SRCDIR)/test_fast_ssim.c
 
 OBJ = $(SRC:.c=.o)
 
@@ -26,7 +27,17 @@ endif
 OUT = $(OUTDIR)/test
 
 LFLAGS=-L$(OUTDIR)
-LIBS=$(OUTDIR)/libiqa.a -lm -lrt
+
+# OS detection for platform-specific libraries
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+    LIBS=$(OUTDIR)/libiqa.a -lm -lrt
+else ifeq ($(UNAME_S),Darwin)
+    LIBS=$(OUTDIR)/libiqa.a -lm
+else
+    # Default for other Unix-like systems
+    LIBS=$(OUTDIR)/libiqa.a -lm
+endif
 
 .c.o:
 	$(CC) $(INCLUDES) $(CFLAGS) -c $< -o $@
