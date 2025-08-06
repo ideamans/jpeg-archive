@@ -66,7 +66,7 @@ $(LIBJPEG):
 	@cd $(MOZJPEG_BUILD_DIR) && \
 		mkdir -p build && \
 		cd build && \
-		cmake -G"Unix Makefiles" \
+		CMAKE_ARGS="-G\"Unix Makefiles\" \
 			-DCMAKE_BUILD_TYPE=Release \
 			-DCMAKE_INSTALL_PREFIX=$(abspath $(MOZJPEG_PREFIX)) \
 			-DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
@@ -74,7 +74,11 @@ $(LIBJPEG):
 			-DENABLE_SHARED=0 \
 			-DENABLE_STATIC=1 \
 			-DBUILD_SHARED_LIBS=0 \
-			-DPNG_SUPPORTED=0 .. && \
+			-DPNG_SUPPORTED=0"; \
+		case "$(shell uname -m)" in \
+			aarch64|arm64) CMAKE_ARGS="$$CMAKE_ARGS -DWITH_SIMD=0" ;; \
+		esac; \
+		eval cmake $$CMAKE_ARGS .. && \
 		$(MAKE) && \
 		$(MAKE) install
 
