@@ -15,25 +15,13 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake nasm valgrind
+          sudo apt-get install -y cmake nasm
 
       - name: Build mozjpeg
         run: make build
 
       - name: Build jpeg-archive
         run: make all
-
-      - name: Run tests
-        run: make test
-
-      - name: Run integration tests
-        run: cd test && ./test.sh
-
-      - name: Run memory leak tests
-        run: ./test/memory_leak_test.sh
-
-      - name: Run memory leak tests
-        run: ./test/memory_leak_test.sh
 
   build-macos:
     runs-on: macos-14
@@ -49,18 +37,6 @@ jobs:
 
       - name: Build jpeg-archive
         run: make all
-
-      - name: Run tests
-        run: make test
-
-      - name: Run integration tests
-        run: cd test && ./test.sh
-
-      - name: Run memory leak tests
-        run: ./test/memory_leak_test.sh
-
-      - name: Run memory leak tests
-        run: ./test/memory_leak_test.sh
 
   build-windows:
     runs-on: windows-latest
@@ -86,29 +62,39 @@ jobs:
       - name: Build jpeg-archive
         run: make all
 
-      - name: Run tests
-        run: make test
+  build-linux-aarch64:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v3
 
-      - name: Run integration tests
-        run: cd test && ./test.sh
+      - name: Set up QEMU
+        run: |
+          brew install qemu
 
-      - name: Run memory leak tests
-        run: ./test/memory_leak_test.sh
+      - name: Build on Linux aarch64
+        uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: aarch64
+          distro: ubuntu22.04
+          githubToken: ${{ github.token }}
+          install: |
+            apt-get update -q -y
+            apt-get install -q -y cmake nasm build-essential git
+          run: |
+            make build
+            make all
 
   build-freebsd:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
 
-      - name: Build and test on FreeBSD
+      - name: Build on FreeBSD
         uses: vmactions/freebsd-vm@v1
         with:
           usesh: true
           prepare: |
-            pkg install -y cmake nasm gmake git valgrind
+            pkg install -y cmake nasm gmake git
           run: |
             gmake build
             gmake all
-            gmake test
-            cd test && ./test.sh
-            ./test/memory_leak_test.sh

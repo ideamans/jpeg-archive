@@ -8,12 +8,14 @@
 
 - ubuntu-latest
 - macos-14
+- linux aarch64 on macos-14 + qemu
 - windows-latest + MSYS2
 - freebsd13 on ubuntu-latest + qemu
 
 ### ビルドツール
 
 #### 共通依存関係
+
 - **Git**: ソースコード管理
 - **Make/GMake**: ビルドシステム
 - **C/C++コンパイラ**: gcc/clang/mingw-gcc
@@ -21,42 +23,49 @@
 #### プラットフォーム別依存関係
 
 ##### Ubuntu/Linux
-- **cmake**: mozjpegビルド用
+
+- **cmake**: mozjpeg ビルド用
 - **nasm**: アセンブリ最適化
 - **valgrind**: メモリリーク検出（オプション）
 
 ##### macOS
-- **cmake**: mozjpegビルド用（brew install cmake）
+
+- **cmake**: mozjpeg ビルド用（brew install cmake）
 - **nasm**: アセンブリ最適化（brew install nasm）
 - **leaks**: メモリリーク検出（標準搭載）
 
 ##### FreeBSD
-- **cmake**: mozjpegビルド用（pkg install cmake）
+
+- **cmake**: mozjpeg ビルド用（pkg install cmake）
 - **nasm**: アセンブリ最適化（pkg install nasm）
 - **gmake**: GNU Make（pkg install gmake）
 - **valgrind**: メモリリーク検出（pkg install valgrind、オプション）
 
 ##### Windows (MSYS2/MinGW)
-- **mingw-w64-x86_64-gcc**: GCCコンパイラ
-- **mingw-w64-x86_64-cmake**: CMakeビルドシステム
+
+- **mingw-w64-x86_64-gcc**: GCC コンパイラ
+- **mingw-w64-x86_64-cmake**: CMake ビルドシステム
 - **mingw-w64-x86_64-nasm**: アセンブリ最適化
 - **drmemory**: メモリリーク検出（オプション）
 
 #### mozjpeg
+
 - **バージョン**: v4.1.5（固定）
 - **ビルドタイプ**: Release（最適化有効、デバッグシンボルなし）
-- **設定**: 
-  - WITH_JPEG8=1（JPEG8互換）
+- **設定**:
+  - WITH_JPEG8=1（JPEG8 互換）
   - ENABLE_SHARED=0（共有ライブラリ無効）
   - ENABLE_STATIC=1（静的ライブラリ有効）
 
 #### iqa
+
 - **ビルドタイプ**: Release
 - **依存**: なし（自己完結型）
 
 #### jpeg-archive
+
 - **最適化レベル**: -O3
-- **C標準**: C99
+- **C 標準**: C99
 - **依存**: mozjpeg, iqa
 
 ### プロセス
