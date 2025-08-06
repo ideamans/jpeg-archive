@@ -67,29 +67,6 @@ jobs:
           export PATH="/mingw64/bin:$PATH"
           make all
 
-  build-linux-aarch64:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up QEMU
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y qemu-user-static
-
-      - name: Build on Linux aarch64
-        uses: uraimo/run-on-arch-action@v2
-        with:
-          arch: aarch64
-          distro: ubuntu22.04
-          githubToken: ${{ github.token }}
-          install: |
-            apt-get update -q -y
-            apt-get install -q -y cmake build-essential git libpng-dev
-          run: |
-            make build
-            make all
-
   build-freebsd:
     runs-on: ubuntu-latest
     steps:
