@@ -10,4 +10,7 @@ comparison
 comparison.png
 test/test.jpg
 test/test
+test/libjpegarchive
 deps/
+libjpegarchive.o
+libjpegarchive.a

@@ -9,6 +9,14 @@ if [ ! -d test-files ]; then
     unzip jpeg-archive-test-files.zip
 fi
 
+echo "=== Running jpeg-recompress tests ==="
 for file in test-files/*; do
     ../jpeg-recompress "$file" "test-output/`basename $file`"
 done
+
+echo ""
+echo "=== Building and running libjpegarchive tests ==="
+cd ..
+make test-libjpegarchive
+cd test
+./libjpegarchive

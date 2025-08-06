@@ -16,7 +16,7 @@ CFLAGS += -I$(MOZJPEG_PREFIX)/include
 
 LIBIQA = src/iqa/build/release/libiqa.a
 
-all: jpeg-recompress jpeg-compare jpeg-hash
+all: jpeg-recompress jpeg-compare jpeg-hash libjpegarchive.a
 
 $(LIBIQA):
 	cd src/iqa; RELEASE=1 $(MAKE)
@@ -32,12 +32,22 @@ jpeg-compare: jpeg-compare.c src/util.o src/hash.o src/edit.o src/smallfry.o $(L
 jpeg-hash: jpeg-hash.c src/util.o src/hash.o $(LIBJPEG) $(JPEGLIB_H)
 	$(CC) $(CFLAGS) -o $@ $< src/util.o src/hash.o $(LIBJPEG) $(LDFLAGS)
 
+libjpegarchive.o: libjpegarchive.c jpegarchive.h src/util.o src/edit.o src/smallfry.o $(LIBIQA) $(JPEGLIB_H)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+libjpegarchive.a: libjpegarchive.o src/util.o src/edit.o src/smallfry.o
+	ar rcs $@ libjpegarchive.o src/util.o src/edit.o src/smallfry.o
+
 %.o: %.c %.h $(JPEGLIB_H)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-test: test/test.c src/util.o src/edit.o src/hash.o
-	$(CC) $(CFLAGS) -o test/$@ $^ $(LIBJPEG) $(LDFLAGS)
-	./test/$@
+test: test/test.c src/util.o src/edit.o src/hash.o test-libjpegarchive-build
+	$(CC) $(CFLAGS) -o test/$@ test/test.c src/util.o src/edit.o src/hash.o $(LIBJPEG) $(LDFLAGS)
+	./test/test
+	./test/libjpegarchive
+
+test-libjpegarchive-build: test/libjpegarchive.c libjpegarchive.a $(LIBIQA) $(LIBJPEG)
+	$(CC) $(CFLAGS) -o test/libjpegarchive $< libjpegarchive.a $(LIBIQA) $(LIBJPEG) $(LDFLAGS)
 
 install: all
 	mkdir -p $(PREFIX)/bin
@@ -67,6 +77,6 @@ $(LIBJPEG):
 		$(MAKE) install
 
 clean:
-	rm -rf jpeg-recompress jpeg-compare jpeg-hash test/test src/*.o src/iqa/build $(DEPS_DIR)
+	rm -rf jpeg-recompress jpeg-compare jpeg-hash libjpegarchive.a libjpegarchive.o test/test test/libjpegarchive src/*.o src/iqa/build $(DEPS_DIR)
 
-.PHONY: test install clean build
+.PHONY: test test-libjpegarchive-build install clean build
