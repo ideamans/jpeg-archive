@@ -58,10 +58,14 @@ jobs:
             git
 
       - name: Build mozjpeg
-        run: make build
+        run: |
+          export PATH="/mingw64/bin:$PATH"
+          make build
 
       - name: Build jpeg-archive
-        run: make all
+        run: |
+          export PATH="/mingw64/bin:$PATH"
+          make all
 
   build-linux-aarch64:
     runs-on: ubuntu-latest

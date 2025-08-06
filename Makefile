@@ -73,7 +73,8 @@ $(LIBJPEG):
 			-DWITH_JPEG8=1 \
 			-DENABLE_SHARED=0 \
 			-DENABLE_STATIC=1 \
-			-DBUILD_SHARED_LIBS=0 .. && \
+			-DBUILD_SHARED_LIBS=0 \
+			-DPNG_SUPPORTED=0 .. && \
 		$(MAKE) && \
 		$(MAKE) install
 
