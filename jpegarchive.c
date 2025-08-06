@@ -8,7 +8,7 @@
 #include <string.h>
 
 // Helper function to convert quality preset to target value
-static float get_target_from_preset(JpegArchiveQuality preset, JpegArchiveMethod method) {
+static float get_target_from_preset(jpegarchive_quality_t preset, jpegarchive_method_t method) {
     if (method == JPEGARCHIVE_METHOD_SSIM) {
         switch (preset) {
             case JPEGARCHIVE_QUALITY_LOW:
@@ -26,8 +26,8 @@ static float get_target_from_preset(JpegArchiveQuality preset, JpegArchiveMethod
     return 0.9999;
 }
 
-JpegRecompressOutput jpeg_recompress(JpegRecompressInput input) {
-    JpegRecompressOutput output;
+jpegarchive_recompress_output_t jpegarchive_recompress(jpegarchive_recompress_input_t input) {
+    jpegarchive_recompress_output_t output;
     memset(&output, 0, sizeof(output));
     
     // Validate input
@@ -244,7 +244,7 @@ JpegRecompressOutput jpeg_recompress(JpegRecompressInput input) {
     return output;
 }
 
-void free_jpeg_recompress_output(JpegRecompressOutput *output) {
+void jpegarchive_free_recompress_output(jpegarchive_recompress_output_t *output) {
     if (output && output->jpeg) {
         free(output->jpeg);
         output->jpeg = NULL;
@@ -252,8 +252,8 @@ void free_jpeg_recompress_output(JpegRecompressOutput *output) {
     }
 }
 
-JpegCompareOutput jpeg_compare(JpegCompareInput input) {
-    JpegCompareOutput output;
+jpegarchive_compare_output_t jpegarchive_compare(jpegarchive_compare_input_t input) {
+    jpegarchive_compare_output_t output;
     memset(&output, 0, sizeof(output));
     
     // Validate input
@@ -312,7 +312,7 @@ JpegCompareOutput jpeg_compare(JpegCompareInput input) {
     return output;
 }
 
-void free_jpeg_compare_output(JpegCompareOutput *output) {
+void jpegarchive_free_compare_output(jpegarchive_compare_output_t *output) {
     // Nothing to free for compare output
     (void)output;
 }

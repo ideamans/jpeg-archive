@@ -94,9 +94,9 @@ static double parse_ssim_from_compare(const char *output) {
     return -1;
 }
 
-// Test jpeg_recompress function
+// Test jpegarchive_recompress function
 static int test_recompress(const char *test_file) {
-    printf("Testing jpeg_recompress with %s...\n", test_file);
+    printf("Testing jpegarchive_recompress with %s...\n", test_file);
     
     // Read test file
     unsigned char *input_buffer;
@@ -107,7 +107,7 @@ static int test_recompress(const char *test_file) {
     }
     
     // Run library version
-    JpegRecompressInput lib_input = {
+    jpegarchive_recompress_input_t lib_input = {
         .jpeg = input_buffer,
         .length = input_size,
         .min = 40,
@@ -117,7 +117,7 @@ static int test_recompress(const char *test_file) {
         .method = JPEGARCHIVE_METHOD_SSIM
     };
     
-    JpegRecompressOutput lib_output = jpeg_recompress(lib_input);
+    jpegarchive_recompress_output_t lib_output = jpegarchive_recompress(lib_input);
     
     if (lib_output.error_code == JPEGARCHIVE_NOT_SUITABLE) {
         printf("  SKIPPED: File not suitable for recompression (e.g., already processed or would be larger)\n");
@@ -138,7 +138,7 @@ static int test_recompress(const char *test_file) {
     // Run CLI version
     char cli_command[512];
     snprintf(cli_command, sizeof(cli_command), 
-             "../jpeg-recompress -q medium -n 40 -x 95 -l 6 %s %s 2>&1",
+             "./jpeg-recompress -q medium -n 40 -x 95 -l 6 %s %s 2>&1",
              test_file, temp_output);
     
     char cli_output[4096];
@@ -147,7 +147,7 @@ static int test_recompress(const char *test_file) {
     if (ret != 0) {
         printf("  ERROR: CLI command failed\n");
         free(input_buffer);
-        free_jpeg_recompress_output(&lib_output);
+        jpegarchive_free_recompress_output(&lib_output);
         return 1;
     }
     
@@ -160,7 +160,7 @@ static int test_recompress(const char *test_file) {
     if (stat(temp_output, &st) != 0) {
         printf("  ERROR: Failed to stat CLI output file\n");
         free(input_buffer);
-        free_jpeg_recompress_output(&lib_output);
+        jpegarchive_free_recompress_output(&lib_output);
         return 1;
     }
     long cli_size = st.st_size;
@@ -197,14 +197,14 @@ static int test_recompress(const char *test_file) {
     // Cleanup
     unlink(temp_output);
     free(input_buffer);
-    free_jpeg_recompress_output(&lib_output);
+    jpegarchive_free_recompress_output(&lib_output);
     
     return passed ? 0 : 1;
 }
 
-// Test jpeg_compare function
+// Test jpegarchive_compare function
 static int test_compare(const char *file1, const char *file2) {
-    printf("Testing jpeg_compare with %s and %s...\n", file1, file2);
+    printf("Testing jpegarchive_compare with %s and %s...\n", file1, file2);
     
     // Read test files
     unsigned char *buffer1, *buffer2;
@@ -219,7 +219,7 @@ static int test_compare(const char *file1, const char *file2) {
     }
     
     // Run library version
-    JpegCompareInput lib_input = {
+    jpegarchive_compare_input_t lib_input = {
         .jpeg1 = buffer1,
         .jpeg2 = buffer2,
         .length1 = size1,
@@ -227,7 +227,7 @@ static int test_compare(const char *file1, const char *file2) {
         .method = JPEGARCHIVE_METHOD_SSIM
     };
     
-    JpegCompareOutput lib_output = jpeg_compare(lib_input);
+    jpegarchive_compare_output_t lib_output = jpegarchive_compare(lib_input);
     
     if (lib_output.error_code != JPEGARCHIVE_OK) {
         printf("  ERROR: Library returned error code %d\n", lib_output.error_code);
@@ -239,7 +239,7 @@ static int test_compare(const char *file1, const char *file2) {
     // Run CLI version with SSIM method
     char cli_command[512];
     snprintf(cli_command, sizeof(cli_command), 
-             "../jpeg-compare -m ssim %s %s 2>&1",
+             "./jpeg-compare -m ssim %s %s 2>&1",
              file1, file2);
     
     char cli_output[1024];
@@ -270,7 +270,7 @@ static int test_compare(const char *file1, const char *file2) {
     // Cleanup
     free(buffer1);
     free(buffer2);
-    free_jpeg_compare_output(&lib_output);
+    jpegarchive_free_compare_output(&lib_output);
     
     return passed ? 0 : 1;
 }
@@ -281,7 +281,7 @@ int main(int argc, char **argv) {
     int total_errors = 0;
     
     // Test jpeg_recompress with all test files
-    DIR *dir = opendir("test-files");
+    DIR *dir = opendir("test/test-files");
     if (!dir) {
         printf("ERROR: Cannot open test-files directory\n");
         return 1;
@@ -293,27 +293,27 @@ int main(int argc, char **argv) {
     
     while ((entry = readdir(dir)) != NULL && num_files < 10) {
         if (strstr(entry->d_name, ".jpg")) {
-            snprintf(test_files[num_files], 256, "test-files/%s", entry->d_name);
+            snprintf(test_files[num_files], 256, "test/test-files/%s", entry->d_name);
             num_files++;
         }
     }
     closedir(dir);
     
     // Test recompress for each file
-    printf("=== Testing jpeg_recompress ===\n");
+    printf("=== Testing jpegarchive_recompress ===\n");
     for (int i = 0; i < num_files; i++) {
         int err = test_recompress(test_files[i]);
         total_errors += err;
     }
     
     // Test compare between original and compressed versions
-    printf("\n=== Testing jpeg_compare ===\n");
+    printf("\n=== Testing jpegarchive_compare ===\n");
     for (int i = 0; i < num_files && i < 3; i++) {  // Test first 3 files
         // First compress the file
         unsigned char *input_buffer;
         long input_size = read_file(test_files[i], &input_buffer);
         if (input_size) {
-            JpegRecompressInput input = {
+            jpegarchive_recompress_input_t input = {
                 .jpeg = input_buffer,
                 .length = input_size,
                 .min = 40,
@@ -323,7 +323,7 @@ int main(int argc, char **argv) {
                 .method = JPEGARCHIVE_METHOD_SSIM
             };
             
-            JpegRecompressOutput output = jpeg_recompress(input);
+            jpegarchive_recompress_output_t output = jpegarchive_recompress(input);
             if (output.error_code == JPEGARCHIVE_OK) {
                 // Write compressed to temp file
                 char temp_file[256];
@@ -339,7 +339,7 @@ int main(int argc, char **argv) {
                     
                     unlink(temp_file);
                 }
-                free_jpeg_recompress_output(&output);
+                jpegarchive_free_recompress_output(&output);
             }
             free(input_buffer);
         }

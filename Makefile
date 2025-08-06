@@ -32,11 +32,11 @@ jpeg-compare: jpeg-compare.c src/util.o src/hash.o src/edit.o src/smallfry.o $(L
 jpeg-hash: jpeg-hash.c src/util.o src/hash.o $(LIBJPEG) $(JPEGLIB_H)
 	$(CC) $(CFLAGS) -o $@ $< src/util.o src/hash.o $(LIBJPEG) $(LDFLAGS)
 
-libjpegarchive.o: libjpegarchive.c jpegarchive.h src/util.o src/edit.o src/smallfry.o $(LIBIQA) $(JPEGLIB_H)
+jpegarchive.o: jpegarchive.c jpegarchive.h src/util.o src/edit.o src/smallfry.o $(LIBIQA) $(JPEGLIB_H)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-libjpegarchive.a: libjpegarchive.o src/util.o src/edit.o src/smallfry.o
-	ar rcs $@ libjpegarchive.o src/util.o src/edit.o src/smallfry.o
+libjpegarchive.a: jpegarchive.o src/util.o src/edit.o src/smallfry.o
+	ar rcs $@ jpegarchive.o src/util.o src/edit.o src/smallfry.o
 
 %.o: %.c %.h $(JPEGLIB_H)
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -61,13 +61,13 @@ build: $(LIBJPEG)
 $(LIBJPEG):
 	@mkdir -p $(MOZJPEG_BUILD_DIR)
 	@if [ ! -d "$(MOZJPEG_BUILD_DIR)/.git" ]; then \
-		git clone https://github.com/mozilla/mozjpeg.git $(MOZJPEG_BUILD_DIR); \
+		git clone --branch v4.1.5 --depth 1 https://github.com/mozilla/mozjpeg.git $(MOZJPEG_BUILD_DIR); \
 	fi
 	@cd $(MOZJPEG_BUILD_DIR) && \
-		git pull && \
 		mkdir -p build && \
 		cd build && \
 		cmake -G"Unix Makefiles" \
+			-DCMAKE_BUILD_TYPE=Release \
 			-DCMAKE_INSTALL_PREFIX=$(abspath $(MOZJPEG_PREFIX)) \
 			-DWITH_JPEG8=1 \
 			-DENABLE_SHARED=0 \
@@ -77,6 +77,6 @@ $(LIBJPEG):
 		$(MAKE) install
 
 clean:
-	rm -rf jpeg-recompress jpeg-compare jpeg-hash libjpegarchive.a libjpegarchive.o test/test test/libjpegarchive src/*.o src/iqa/build $(DEPS_DIR)
+	rm -rf jpeg-recompress jpeg-compare jpeg-hash libjpegarchive.a jpegarchive.o test/test test/libjpegarchive src/*.o src/iqa/build $(DEPS_DIR)
 
 .PHONY: test test-libjpegarchive-build install clean build

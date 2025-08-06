@@ -12,5 +12,6 @@ test/test.jpg
 test/test
 test/libjpegarchive
 deps/
+jpegarchive.o
 libjpegarchive.o
 libjpegarchive.a

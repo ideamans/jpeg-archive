@@ -1,5 +1,5 @@
-#ifndef JPEGARCHIVE_H
-#define JPEGARCHIVE_H
+#ifndef JPEG_ARCHIVE_H
+#define JPEG_ARCHIVE_H
 
 #include <stdint.h>
 
@@ -16,12 +16,12 @@ typedef enum {
     JPEGARCHIVE_NOT_SUITABLE,
     JPEGARCHIVE_MEMORY_ERROR,
     JPEGARCHIVE_UNKNOWN_ERROR
-} JpegArchiveErrorCode;
+} jpegarchive_error_code_t;
 
 // Method enum
 typedef enum {
     JPEGARCHIVE_METHOD_SSIM = 0
-} JpegArchiveMethod;
+} jpegarchive_method_t;
 
 // Quality preset
 typedef enum {
@@ -29,52 +29,52 @@ typedef enum {
     JPEGARCHIVE_QUALITY_MEDIUM,
     JPEGARCHIVE_QUALITY_HIGH,
     JPEGARCHIVE_QUALITY_VERYHIGH
-} JpegArchiveQuality;
+} jpegarchive_quality_t;
 
-// Input structure for jpeg_recompress
+// Input structure for jpegarchive_recompress
 typedef struct {
     const unsigned char *jpeg;
     int64_t length;
     int min;
     int max;
     int loops;
-    JpegArchiveQuality quality;
-    JpegArchiveMethod method;
-} JpegRecompressInput;
+    jpegarchive_quality_t quality;
+    jpegarchive_method_t method;
+} jpegarchive_recompress_input_t;
 
-// Output structure for jpeg_recompress
+// Output structure for jpegarchive_recompress
 typedef struct {
-    JpegArchiveErrorCode error_code;
+    jpegarchive_error_code_t error_code;
     unsigned char *jpeg;
     int64_t length;
     int quality;
     double metric;
-} JpegRecompressOutput;
+} jpegarchive_recompress_output_t;
 
-// Input structure for jpeg_compare
+// Input structure for jpegarchive_compare
 typedef struct {
     const unsigned char *jpeg1;
     const unsigned char *jpeg2;
     int64_t length1;
     int64_t length2;
-    JpegArchiveMethod method;
-} JpegCompareInput;
+    jpegarchive_method_t method;
+} jpegarchive_compare_input_t;
 
-// Output structure for jpeg_compare
+// Output structure for jpegarchive_compare
 typedef struct {
-    JpegArchiveErrorCode error_code;
+    jpegarchive_error_code_t error_code;
     double metric;
-} JpegCompareOutput;
+} jpegarchive_compare_output_t;
 
 // Function declarations
-JpegRecompressOutput jpeg_recompress(JpegRecompressInput input);
-void free_jpeg_recompress_output(JpegRecompressOutput *output);
+jpegarchive_recompress_output_t jpegarchive_recompress(jpegarchive_recompress_input_t input);
+void jpegarchive_free_recompress_output(jpegarchive_recompress_output_t *output);
 
-JpegCompareOutput jpeg_compare(JpegCompareInput input);
-void free_jpeg_compare_output(JpegCompareOutput *output);
+jpegarchive_compare_output_t jpegarchive_compare(jpegarchive_compare_input_t input);
+void jpegarchive_free_compare_output(jpegarchive_compare_output_t *output);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // JPEGARCHIVE_H
+#endif // JPEG_ARCHIVE_H

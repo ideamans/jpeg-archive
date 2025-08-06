@@ -120,18 +120,19 @@ jpeg-recompress の品質プリセット：
 
 jpeg-archive スクリプトは`ladon`または`parallel`を使用してマルチコア処理を実現。大量の画像処理時に推奨。
 
-# libjepgarchive
+# libjpegarchive
 
 一部の機能を静的ライブラリとしてエクスポートする。
 
 - jpegarchive.h
+- jpegarchive.c
 - libjpegarchive.a
 
-## jpeg_recompress
+## jpegarchive_recompress
 
 @jpeg-recompress.c のインターフェースを変更して機能を提供する。
 
-### 入力 JpegRecompressInput
+### 入力 jpegarchive_recompress_input_t
 
 - jpeg byte[]
 - length int64
@@ -143,7 +144,7 @@ jpeg-archive スクリプトは`ladon`または`parallel`を使用してマル�
 
 その他のオプションは jpeg-recompress のデフォルトを採用。
 
-### 出力 JpegRecompressOutput
+### 出力 jpegarchive_recompress_output_t
 
 - errorCode enum (Ok|NotJpeg|Unsupported|NotSuitable|MemoryError|Unknown)
   - Ok 成功
@@ -158,20 +159,20 @@ jpeg-archive スクリプトは`ladon`または`parallel`を使用してマル�
 - quality int
 - metric double
 
-## free_jpeg_recompress_output
+## jpegarchive_free_recompress_output
 
-メモリリークを防ぐため、JpegRecompressOutput のメモリを解放する関数。
+メモリリークを防ぐため、jpegarchive_recompress_output_t のメモリを解放する関数。
 
 - 入力
-  - output JpegRecompressOutput
+  - output jpegarchive_recompress_output_t
 - 出力
   - なし
 
-## jpeg_compare
+## jpegarchive_compare
 
 jpeg_compare.c を元に JPEG の SSIM 比較を行う。入力値がメモリになることと method が実質 SSIM だけのことを除き、その他のパラメータはデフォルト値を採用する。
 
-### 入力 JpegCompareInput
+### 入力 jpegarchive_compare_input_t
 
 - jpeg1 byte[]
 - jpeg2 byte[]
@@ -191,18 +192,18 @@ jpeg_compare.c を元に JPEG の SSIM 比較を行う。入力値がメモリ�
   - Unknown 不明なエラー
 - metric double
 
-## free_jpeg_compare_output
+## jpegarchive_free_compare_output
 
-メモリリークを防ぐため、JpegCompareOutput のメモリを解放する関数。
+メモリリークを防ぐため、jpegarchive_compare_output_t のメモリを解放する関数。
 
 - 入力
-  - output JpegCompareOutput
+  - output jpegarchive_compare_output_t
 - 出力
   - なし
 
 ## テスト
 
-- @test/test-files 内のファイルを jpeg_recompress して、CLI 版の jpeg-recompress と SSIM、quality、ファイルサイズを比較する。
+- @test/test-files 内のファイルを jpegarchive_recompress して、CLI 版の jpeg-recompress と SSIM、quality、ファイルサイズを比較する。
 - それぞれ 5%未満の誤差であれば合格とする。
-- 続けてその結果を元の画像と jpeg_compare して SSIM 値が CLI 版の jpeg-compare と同一になることを確認する。
+- 続けてその結果を元の画像と jpegarchive_compare して SSIM 値が CLI 版の jpeg-compare と同一になることを確認する。
 - CLI は STDERR または STDOUT に結果を出力するので、それをパースして出力値とする。
