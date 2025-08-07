@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main, develop]
+  pull_request:
+    branches: [master, main, develop]
+
+jobs:
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake nasm build-essential libpng-dev
+
+      - name: Build mozjpeg
+        run: make build
+
+      - name: Build jpeg-archive
+        run: make all
+
+      - name: Run IQA tests
+        run: |
+          cd src/iqa
+          make test
+
+      - name: Run unit tests
+        run: make test
+
+  build-macos:
+    runs-on: macos-14
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          brew install cmake nasm
+
+      - name: Build mozjpeg
+        run: make build
+
+      - name: Build jpeg-archive
+        run: make all
+
+      - name: Run IQA tests
+        run: |
+          cd src/iqa
+          make test
+
+      - name: Run unit tests
+        run: make test
+
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-nasm
+            make
+            git
+            unzip
+
+      - name: Build mozjpeg
+        run: |
+          export PATH="/mingw64/bin:$PATH"
+          make build
+
+      - name: Build jpeg-archive
+        run: |
+          export PATH="/mingw64/bin:$PATH"
+          make all
+
+      - name: Run IQA tests
+        run: |
+          export PATH="/mingw64/bin:$PATH"
+          cd src/iqa
+          make test
+
+      - name: Run unit tests
+        run: |
+          export PATH="/mingw64/bin:$PATH"
+          make test
+
+  build-freebsd:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build on FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        with:
+          usesh: true
+          prepare: |
+            pkg install -y cmake nasm gmake git gcc bash
+          run: |
+            gmake build
+            gmake all
+            cd src/iqa
+            gmake test
+            cd ../..
+            gmake test
