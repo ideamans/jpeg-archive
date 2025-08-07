@@ -75,6 +75,7 @@ jobs:
             mingw-w64-x86_64-nasm
             make
             git
+            unzip
 
       - name: Build mozjpeg
         run: |
@@ -108,7 +109,7 @@ jobs:
         with:
           usesh: true
           prepare: |
-            pkg install -y cmake nasm gmake git gcc
+            pkg install -y cmake nasm gmake git gcc bash
           run: |
             gmake build
             gmake all

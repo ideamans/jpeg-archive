@@ -44,7 +44,7 @@ libjpegarchive.a: jpegarchive.o src/util.o src/edit.o src/smallfry.o
 test: jpeg-recompress test/test.c src/util.o src/edit.o src/hash.o test/libjpegarchive.c libjpegarchive.a $(LIBIQA) $(LIBJPEG)
 	$(CC) $(CFLAGS) -o test/test test/test.c src/util.o src/edit.o src/hash.o $(LIBJPEG) $(LDFLAGS)
 	$(CC) $(CFLAGS) -o test/libjpegarchive test/libjpegarchive.c libjpegarchive.a $(LIBIQA) $(LIBJPEG) $(LDFLAGS)
-	cd test; ./test.sh
+	cd test && bash test.sh
 
 install: all
 	mkdir -p $(PREFIX)/bin
