@@ -4,15 +4,15 @@ set -e
 
 mkdir -p test-output
 
-# Run unit tests
-echo "=== Running unit tests ==="
-./test
-
 # Download test files if needed
 if [ ! -d test-files ]; then
     curl -O -L https://www.dropbox.com/s/hb3ah7p5hcjvhc1/jpeg-archive-test-files.zip
     unzip jpeg-archive-test-files.zip
 fi
+
+# Run unit tests
+echo "=== Running unit tests ==="
+./test
 
 # Run jpeg-recompress tests
 echo ""
