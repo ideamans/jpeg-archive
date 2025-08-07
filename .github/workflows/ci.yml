@@ -108,7 +108,7 @@ jobs:
         with:
           usesh: true
           prepare: |
-            pkg install -y cmake nasm gmake git
+            pkg install -y cmake nasm gmake git gcc
           run: |
             gmake build
             gmake all
