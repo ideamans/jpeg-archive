@@ -24,6 +24,9 @@ jobs:
       - name: Build jpeg-archive
         run: make all
 
+      - name: Run unit tests
+        run: make test
+
       - name: Run IQA tests
         run: |
           cd src/iqa
@@ -44,6 +47,9 @@ jobs:
 
       - name: Build jpeg-archive
         run: make all
+
+      - name: Run unit tests
+        run: make test
 
       - name: Run IQA tests
         run: |
@@ -80,6 +86,11 @@ jobs:
           export PATH="/mingw64/bin:$PATH"
           make all
 
+      - name: Run unit tests
+        run: |
+          export PATH="/mingw64/bin:$PATH"
+          make test
+
       - name: Run IQA tests
         run: |
           export PATH="/mingw64/bin:$PATH"
@@ -101,5 +112,6 @@ jobs:
           run: |
             gmake build
             gmake all
+            gmake test
             cd src/iqa
             gmake test
