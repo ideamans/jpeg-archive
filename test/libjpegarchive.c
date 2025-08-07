@@ -5,8 +5,16 @@
 #include <math.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include "../jpegarchive.h"
+
+// Get current time in microseconds
+static long long get_time_us() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (long long)tv.tv_sec * 1000000LL + (long long)tv.tv_usec;
+}
 
 // Function to read file into buffer
 static long read_file(const char *filename, unsigned char **buffer) {
@@ -121,7 +129,9 @@ static int test_recompress(const char *test_file) {
         .method = JPEGARCHIVE_METHOD_SSIM
     };
     
+    long long lib_start = get_time_us();
     jpegarchive_recompress_output_t lib_output = jpegarchive_recompress(lib_input);
+    long long lib_time = get_time_us() - lib_start;
     
     if (lib_output.error_code == JPEGARCHIVE_NOT_SUITABLE) {
         printf("  SKIPPED: File not suitable for recompression (e.g., already processed or would be larger)\n");
@@ -137,16 +147,34 @@ static int test_recompress(const char *test_file) {
     
     // Create temp output file
     char temp_output[256];
-    snprintf(temp_output, sizeof(temp_output), "/tmp/test_output_%d.jpg", getpid());
+    #ifdef _WIN32
+        // Windows: use current directory or TEMP environment variable
+        const char *temp_dir = getenv("TEMP");
+        if (!temp_dir) temp_dir = getenv("TMP");
+        if (!temp_dir) temp_dir = ".";
+        snprintf(temp_output, sizeof(temp_output), "%s\\test_output_%d.jpg", temp_dir, getpid());
+    #else
+        snprintf(temp_output, sizeof(temp_output), "/tmp/test_output_%d.jpg", getpid());
+    #endif
     
     // Run CLI version
     char cli_command[512];
-    snprintf(cli_command, sizeof(cli_command), 
-             "../jpeg-recompress -q medium -n 40 -x 95 -l 6 %s %s 2>&1",
-             test_file, temp_output);
+    const char *exe_path = "../jpeg-recompress";
+    const char *exe_ext = "";
     
+    // Check if Windows executable exists
+    #ifdef _WIN32
+        exe_ext = ".exe";
+    #endif
+    
+    snprintf(cli_command, sizeof(cli_command), 
+             "%s%s -q medium -n 40 -x 95 -l 6 %s %s 2>&1",
+             exe_path, exe_ext, test_file, temp_output);
+    
+    long long cli_start = get_time_us();
     char cli_output[4096];
     int ret = run_command_and_get_output(cli_command, cli_output, sizeof(cli_output));
+    long long cli_time = get_time_us() - cli_start;
     
     if (ret != 0) {
         printf("  ERROR: CLI command failed\n");
@@ -198,6 +226,13 @@ static int test_recompress(const char *test_file) {
         passed = 0;
     }
     
+    // Performance comparison
+    double speedup = (double)cli_time / (double)lib_time;
+    double speedup_percent = (speedup - 1.0) * 100.0;
+    
+    printf("  Time - CLI: %.2fms, Library: %.2fms\n", cli_time / 1000.0, lib_time / 1000.0);
+    printf("  Performance: Library is %.1fx faster (%.0f%% speedup)\n", speedup, speedup_percent);
+    
     // Cleanup
     unlink(temp_output);
     free(input_buffer);
@@ -231,7 +266,9 @@ static int test_compare(const char *file1, const char *file2) {
         .method = JPEGARCHIVE_METHOD_SSIM
     };
     
+    long long lib_start = get_time_us();
     jpegarchive_compare_output_t lib_output = jpegarchive_compare(lib_input);
+    long long lib_time = get_time_us() - lib_start;
     
     if (lib_output.error_code != JPEGARCHIVE_OK) {
         printf("  ERROR: Library returned error code %d\n", lib_output.error_code);
@@ -242,12 +279,19 @@ static int test_compare(const char *file1, const char *file2) {
     
     // Run CLI version with SSIM method
     char cli_command[512];
-    snprintf(cli_command, sizeof(cli_command), 
-             "../jpeg-compare -m ssim %s %s 2>&1",
-             file1, file2);
+    const char *exe_ext = "";
+    #ifdef _WIN32
+        exe_ext = ".exe";
+    #endif
     
+    snprintf(cli_command, sizeof(cli_command), 
+             "../jpeg-compare%s -m ssim %s %s 2>&1",
+             exe_ext, file1, file2);
+    
+    long long cli_start = get_time_us();
     char cli_output[1024];
     int ret = run_command_and_get_output(cli_command, cli_output, sizeof(cli_output));
+    long long cli_time = get_time_us() - cli_start;
     
     if (ret != 0) {
         printf("  ERROR: CLI command failed\n");
@@ -270,6 +314,13 @@ static int test_compare(const char *file1, const char *file2) {
     if (!passed) {
         printf("  ERROR: SSIM values differ by %f\n", diff);
     }
+    
+    // Performance comparison
+    double speedup = (double)cli_time / (double)lib_time;
+    double speedup_percent = (speedup - 1.0) * 100.0;
+    
+    printf("  Time - CLI: %.2fms, Library: %.2fms\n", cli_time / 1000.0, lib_time / 1000.0);
+    printf("  Performance: Library is %.1fx faster (%.0f%% speedup)\n", speedup, speedup_percent);
     
     // Cleanup
     free(buffer1);
