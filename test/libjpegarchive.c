@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,6 +40,9 @@ static long read_file(const char *filename, unsigned char **buffer) {
 static int run_command_and_get_output(const char *command, char *output, int max_output) {
     FILE *pipe = popen(command, "r");
     if (!pipe) return -1;
+    
+    // Initialize output buffer
+    output[0] = '\0';
     
     int total = 0;
     while (fgets(output + total, max_output - total, pipe) != NULL) {
