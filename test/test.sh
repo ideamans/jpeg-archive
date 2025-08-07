@@ -32,8 +32,15 @@ echo "=== Running unit tests ==="
 # Run jpeg-recompress tests
 echo ""
 echo "=== Running jpeg-recompress tests ==="
+
+# Determine the executable name (with .exe on Windows)
+JPEG_RECOMPRESS="../jpeg-recompress"
+if [ -f "../jpeg-recompress.exe" ]; then
+    JPEG_RECOMPRESS="../jpeg-recompress.exe"
+fi
+
 for file in test-files/*; do
-    ../jpeg-recompress "$file" "test-output/`basename $file`"
+    "$JPEG_RECOMPRESS" "$file" "test-output/$(basename "$file")"
 done
 
 # Run libjpegarchive tests

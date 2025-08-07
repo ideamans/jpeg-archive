@@ -148,11 +148,8 @@ static int test_recompress(const char *test_file) {
     // Create temp output file
     char temp_output[256];
     #ifdef _WIN32
-        // Windows: use current directory or TEMP environment variable
-        const char *temp_dir = getenv("TEMP");
-        if (!temp_dir) temp_dir = getenv("TMP");
-        if (!temp_dir) temp_dir = ".";
-        snprintf(temp_output, sizeof(temp_output), "%s\\test_output_%d.jpg", temp_dir, getpid());
+        // Windows: use current directory (MSYS2 prefers forward slashes)
+        snprintf(temp_output, sizeof(temp_output), "./test_output_%d.jpg", getpid());
     #else
         snprintf(temp_output, sizeof(temp_output), "/tmp/test_output_%d.jpg", getpid());
     #endif
@@ -177,7 +174,9 @@ static int test_recompress(const char *test_file) {
     long long cli_time = get_time_us() - cli_start;
     
     if (ret != 0) {
-        printf("  ERROR: CLI command failed\n");
+        printf("  ERROR: CLI command failed with return code %d\n", ret);
+        printf("  Command: %s\n", cli_command);
+        printf("  Output: %s\n", cli_output);
         free(input_buffer);
         jpegarchive_free_recompress_output(&lib_output);
         return 1;
