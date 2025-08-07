@@ -39,3 +39,4 @@ clean:
 .PHONY : test
 test: $(OUT)
 	cd test; $(MAKE);
+	cd build/debug && ./test

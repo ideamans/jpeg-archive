@@ -9,6 +9,7 @@ on:
 jobs:
   build-ubuntu:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v3
 
@@ -23,8 +24,14 @@ jobs:
       - name: Build jpeg-archive
         run: make all
 
+      - name: Run IQA tests
+        run: |
+          cd src/iqa
+          make test
+
   build-macos:
     runs-on: macos-14
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v3
 
@@ -38,8 +45,14 @@ jobs:
       - name: Build jpeg-archive
         run: make all
 
+      - name: Run IQA tests
+        run: |
+          cd src/iqa
+          make test
+
   build-windows:
     runs-on: windows-latest
+    timeout-minutes: 10
     defaults:
       run:
         shell: msys2 {0}
@@ -67,8 +80,15 @@ jobs:
           export PATH="/mingw64/bin:$PATH"
           make all
 
+      - name: Run IQA tests
+        run: |
+          export PATH="/mingw64/bin:$PATH"
+          cd src/iqa
+          make test
+
   build-freebsd:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v3
 
@@ -81,3 +101,5 @@ jobs:
           run: |
             gmake build
             gmake all
+            cd src/iqa
+            gmake test
