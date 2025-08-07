@@ -138,7 +138,7 @@ static int test_recompress(const char *test_file) {
     // Run CLI version
     char cli_command[512];
     snprintf(cli_command, sizeof(cli_command), 
-             "./jpeg-recompress -q medium -n 40 -x 95 -l 6 %s %s 2>&1",
+             "../jpeg-recompress -q medium -n 40 -x 95 -l 6 %s %s 2>&1",
              test_file, temp_output);
     
     char cli_output[4096];
@@ -239,7 +239,7 @@ static int test_compare(const char *file1, const char *file2) {
     // Run CLI version with SSIM method
     char cli_command[512];
     snprintf(cli_command, sizeof(cli_command), 
-             "./jpeg-compare -m ssim %s %s 2>&1",
+             "../jpeg-compare -m ssim %s %s 2>&1",
              file1, file2);
     
     char cli_output[1024];
@@ -281,7 +281,7 @@ int main(int argc, char **argv) {
     int total_errors = 0;
     
     // Test jpeg_recompress with all test files
-    DIR *dir = opendir("test/test-files");
+    DIR *dir = opendir("test-files");
     if (!dir) {
         printf("ERROR: Cannot open test-files directory\n");
         return 1;
@@ -293,7 +293,7 @@ int main(int argc, char **argv) {
     
     while ((entry = readdir(dir)) != NULL && num_files < 10) {
         if (strstr(entry->d_name, ".jpg")) {
-            snprintf(test_files[num_files], 256, "test/test-files/%s", entry->d_name);
+            snprintf(test_files[num_files], 256, "test-files/%s", entry->d_name);
             num_files++;
         }
     }
