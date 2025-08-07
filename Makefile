@@ -41,13 +41,10 @@ libjpegarchive.a: jpegarchive.o src/util.o src/edit.o src/smallfry.o
 %.o: %.c %.h $(JPEGLIB_H)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-test: test/test.c src/util.o src/edit.o src/hash.o test-libjpegarchive-build
-	$(CC) $(CFLAGS) -o test/$@ test/test.c src/util.o src/edit.o src/hash.o $(LIBJPEG) $(LDFLAGS)
-	./test/test
-	./test/libjpegarchive
-
-test-libjpegarchive-build: test/libjpegarchive.c libjpegarchive.a $(LIBIQA) $(LIBJPEG)
-	$(CC) $(CFLAGS) -o test/libjpegarchive $< libjpegarchive.a $(LIBIQA) $(LIBJPEG) $(LDFLAGS)
+test: jpeg-recompress test/test.c src/util.o src/edit.o src/hash.o test/libjpegarchive.c libjpegarchive.a $(LIBIQA) $(LIBJPEG)
+	$(CC) $(CFLAGS) -o test/test test/test.c src/util.o src/edit.o src/hash.o $(LIBJPEG) $(LDFLAGS)
+	$(CC) $(CFLAGS) -o test/libjpegarchive test/libjpegarchive.c libjpegarchive.a $(LIBIQA) $(LIBJPEG) $(LDFLAGS)
+	cd test; ./test.sh
 
 install: all
 	mkdir -p $(PREFIX)/bin

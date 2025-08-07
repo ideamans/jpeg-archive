@@ -2,18 +2,10 @@
 
 set -e
 
-# Change to test directory if not already there
-if [ "$(basename $(pwd))" != "test" ]; then
-    cd test
-fi
-
 mkdir -p test-output
 
-# Build and run unit tests
-echo "=== Building and running unit tests ==="
-cd ..
-make test-build
-cd test
+# Run unit tests
+echo "=== Running unit tests ==="
 ./test
 
 # Download test files if needed
@@ -29,10 +21,7 @@ for file in test-files/*; do
     ../jpeg-recompress "$file" "test-output/`basename $file`"
 done
 
-# Build and run libjpegarchive tests
+# Run libjpegarchive tests
 echo ""
-echo "=== Building and running libjpegarchive tests ==="
-cd ..
-make test-libjpegarchive-build
-cd test
+echo "=== Running libjpegarchive tests ==="
 ./libjpegarchive
