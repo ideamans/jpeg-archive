@@ -399,6 +399,72 @@ int main(int argc, char **argv) {
         }
     }
     
+    // Test CMYK JPEG handling
+    printf("\n=== Testing CMYK JPEG handling ===\n");
+    
+    // Test if extra-test-data/colorspace_cmyk.jpg exists
+    const char *cmyk_file = "extra-test-data/colorspace_cmyk.jpg";
+    struct stat cmyk_stat;
+    if (stat(cmyk_file, &cmyk_stat) == 0) {
+        printf("Testing CMYK JPEG with jpegarchive_recompress...\n");
+        
+        // Read CMYK file
+        unsigned char *cmyk_buffer;
+        long cmyk_size = read_file(cmyk_file, &cmyk_buffer);
+        if (cmyk_size) {
+            // Test recompress - should return UNSUPPORTED error
+            jpegarchive_recompress_input_t cmyk_input = {
+                .jpeg = cmyk_buffer,
+                .length = cmyk_size,
+                .min = 40,
+                .max = 95,
+                .loops = 6,
+                .quality = JPEGARCHIVE_QUALITY_MEDIUM,
+                .method = JPEGARCHIVE_METHOD_SSIM
+            };
+            
+            jpegarchive_recompress_output_t cmyk_output = jpegarchive_recompress(cmyk_input);
+            
+            if (cmyk_output.error_code == JPEGARCHIVE_UNSUPPORTED) {
+                printf("  ✓ CMYK JPEG correctly rejected with UNSUPPORTED error\n");
+            } else {
+                printf("  ERROR: Expected UNSUPPORTED error for CMYK JPEG, got error code %d\n", cmyk_output.error_code);
+                total_errors++;
+            }
+            
+            jpegarchive_free_recompress_output(&cmyk_output);
+            
+            // Test compare - should also return UNSUPPORTED error
+            printf("Testing CMYK JPEG with jpegarchive_compare...\n");
+            
+            // Compare CMYK with itself
+            jpegarchive_compare_input_t cmyk_compare_input = {
+                .jpeg1 = cmyk_buffer,
+                .jpeg2 = cmyk_buffer,
+                .length1 = cmyk_size,
+                .length2 = cmyk_size,
+                .method = JPEGARCHIVE_METHOD_SSIM
+            };
+            
+            jpegarchive_compare_output_t cmyk_compare_output = jpegarchive_compare(cmyk_compare_input);
+            
+            if (cmyk_compare_output.error_code == JPEGARCHIVE_UNSUPPORTED) {
+                printf("  ✓ CMYK JPEG correctly rejected with UNSUPPORTED error\n");
+            } else {
+                printf("  ERROR: Expected UNSUPPORTED error for CMYK JPEG, got error code %d\n", cmyk_compare_output.error_code);
+                total_errors++;
+            }
+            
+            jpegarchive_free_compare_output(&cmyk_compare_output);
+            
+            free(cmyk_buffer);
+        } else {
+            printf("  WARNING: Failed to read CMYK test file\n");
+        }
+    } else {
+        printf("  INFO: CMYK test file not found at %s, skipping CMYK tests\n", cmyk_file);
+    }
+    
     printf("\n=== Test Summary ===\n");
     if (total_errors == 0) {
         printf("All tests PASSED!\n");
