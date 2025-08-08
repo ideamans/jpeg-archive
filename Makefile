@@ -1,5 +1,5 @@
 CC ?= gcc
-CFLAGS += -std=c99 -Wall -O3
+CFLAGS += -std=c99 -Wall -O3 -fPIC
 LDFLAGS += -lm
 MAKE ?= make
 PREFIX ?= /usr/local
@@ -67,6 +67,7 @@ $(LIBJPEG):
 			-DCMAKE_BUILD_TYPE=Release \
 			-DCMAKE_INSTALL_PREFIX=$(abspath $(MOZJPEG_PREFIX)) \
 			-DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+			-DCMAKE_POSITION_INDEPENDENT_CODE=ON \
 			-DWITH_JPEG8=1 \
 			-DENABLE_SHARED=0 \
 			-DENABLE_STATIC=1 \
