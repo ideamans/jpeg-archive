@@ -205,7 +205,8 @@ jpegarchive_recompress_output_t jpegarchive_recompress(jpegarchive_recompress_in
         return output;
     }
     
-    float target = get_target_from_preset(input.quality, input.method);
+    // Use provided target value if non-zero, otherwise use preset
+    float target = (input.target > 0) ? input.target : get_target_from_preset(input.quality, input.method);
     
     // Decode original image
     unsigned char *original = NULL;

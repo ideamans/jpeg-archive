@@ -126,7 +126,8 @@ static int test_recompress(const char *test_file) {
         .max = 95,
         .loops = 6,
         .quality = JPEGARCHIVE_QUALITY_MEDIUM,
-        .method = JPEGARCHIVE_METHOD_SSIM
+        .method = JPEGARCHIVE_METHOD_SSIM,
+        .target = 0  // Use quality preset
     };
     
     long long lib_start = get_time_us();
@@ -360,6 +361,57 @@ int main(int argc, char **argv) {
         total_errors += err;
     }
     
+    // Test recompress with custom target value
+    printf("\n=== Testing jpegarchive_recompress with custom target ===\n");
+    if (num_files > 0) {
+        printf("Testing custom target value with %s...\n", test_files[0]);
+        
+        // Read test file
+        unsigned char *input_buffer;
+        long input_size = read_file(test_files[0], &input_buffer);
+        if (input_size) {
+            // Test with custom target value (0.995)
+            jpegarchive_recompress_input_t custom_input = {
+                .jpeg = input_buffer,
+                .length = input_size,
+                .min = 40,
+                .max = 95,
+                .loops = 6,
+                .quality = JPEGARCHIVE_QUALITY_MEDIUM,  // This will be ignored
+                .method = JPEGARCHIVE_METHOD_SSIM,
+                .target = 0.995  // Custom target value
+            };
+            
+            jpegarchive_recompress_output_t custom_output = jpegarchive_recompress(custom_input);
+            
+            if (custom_output.error_code == JPEGARCHIVE_OK) {
+                printf("  Custom target test: quality=%d, ssim=%f, size=%lld\n", 
+                       custom_output.quality, custom_output.metric, (long long)custom_output.length);
+                
+                // The metric should be close to the target value (0.995)
+                double target_diff = fabs(custom_output.metric - 0.995);
+                if (target_diff < 0.01) {  // Allow some tolerance
+                    printf("  ✓ Custom target test PASSED (metric close to target)\n");
+                } else {
+                    printf("  WARNING: Metric %f differs from target 0.995 by %f\n", 
+                           custom_output.metric, target_diff);
+                }
+                
+                jpegarchive_free_recompress_output(&custom_output);
+            } else if (custom_output.error_code == JPEGARCHIVE_NOT_SUITABLE) {
+                printf("  INFO: File not suitable for custom target test\n");
+            } else {
+                printf("  ERROR: Custom target test failed with error code %d\n", custom_output.error_code);
+                total_errors++;
+            }
+            
+            free(input_buffer);
+        } else {
+            printf("  ERROR: Failed to read test file for custom target test\n");
+            total_errors++;
+        }
+    }
+    
     // Test compare between original and compressed versions
     printf("\n=== Testing jpegarchive_compare ===\n");
     for (int i = 0; i < num_files && i < 3; i++) {  // Test first 3 files
@@ -374,7 +426,8 @@ int main(int argc, char **argv) {
                 .max = 95,
                 .loops = 6,
                 .quality = JPEGARCHIVE_QUALITY_MEDIUM,
-                .method = JPEGARCHIVE_METHOD_SSIM
+                .method = JPEGARCHIVE_METHOD_SSIM,
+                .target = 0  // Use quality preset
             };
             
             jpegarchive_recompress_output_t output = jpegarchive_recompress(input);
@@ -420,7 +473,8 @@ int main(int argc, char **argv) {
                 .max = 95,
                 .loops = 6,
                 .quality = JPEGARCHIVE_QUALITY_MEDIUM,
-                .method = JPEGARCHIVE_METHOD_SSIM
+                .method = JPEGARCHIVE_METHOD_SSIM,
+                .target = 0  // Use quality preset
             };
             
             jpegarchive_recompress_output_t cmyk_output = jpegarchive_recompress(cmyk_input);
