@@ -105,13 +105,13 @@ static unsigned long safeEncodeJpeg(unsigned char **jpeg, unsigned char *buf, in
     struct jpegarchive_error_mgr jerr;
     JSAMPROW row_pointer[1];
     int row_stride = width * (pixelFormat == JCS_RGB ? 3 : 1);
-    
+
     *error = JPEGARCHIVE_OK;
-    
+
     // Set up error handling
     cinfo.err = jpeg_std_error(&jerr.pub);
     jerr.pub.error_exit = jpegarchive_error_exit;
-    
+
     // Establish the setjmp return context
     if (setjmp(jerr.setjmp_buffer)) {
         // If we get here, libjpeg encountered an error
@@ -119,44 +119,69 @@ static unsigned long safeEncodeJpeg(unsigned char **jpeg, unsigned char *buf, in
         *error = JPEGARCHIVE_UNKNOWN_ERROR;
         return 0;
     }
-    
+
     jpeg_create_compress(&cinfo);
+
+    if (!optimize) {
+        if (jpeg_c_int_param_supported(&cinfo, JINT_COMPRESS_PROFILE)) {
+            jpeg_c_set_int_param(&cinfo, JINT_COMPRESS_PROFILE, JCP_FASTEST);
+        }
+    }
+
     jpeg_mem_dest(&cinfo, jpeg, &jpegSize);
-    
+
     // Set options
     cinfo.image_width = width;
     cinfo.image_height = height;
     cinfo.input_components = pixelFormat == JCS_RGB ? 3 : 1;
     cinfo.in_color_space = pixelFormat;
-    
+
     jpeg_set_defaults(&cinfo);
-    jpeg_set_quality(&cinfo, quality, TRUE);
-    
-    if (optimize) {
-        cinfo.optimize_coding = TRUE;
+
+    if (!optimize) {
+        if (jpeg_c_bool_param_supported(&cinfo, JBOOLEAN_TRELLIS_QUANT)) {
+            jpeg_c_set_bool_param(&cinfo, JBOOLEAN_TRELLIS_QUANT, FALSE);
+        }
+        if (jpeg_c_bool_param_supported(&cinfo, JBOOLEAN_TRELLIS_QUANT_DC)) {
+            jpeg_c_set_bool_param(&cinfo, JBOOLEAN_TRELLIS_QUANT_DC, FALSE);
+        }
     }
-    
-    if (progressive) {
+
+    if (optimize && !progressive) {
+        cinfo.scan_info = NULL;
+        cinfo.num_scans = 0;
+        if (jpeg_c_bool_param_supported(&cinfo, JBOOLEAN_OPTIMIZE_SCANS)) {
+            jpeg_c_set_bool_param(&cinfo, JBOOLEAN_OPTIMIZE_SCANS, FALSE);
+        }
+    }
+
+    if (!optimize && progressive) {
         jpeg_simple_progression(&cinfo);
     }
-    
+
     // Handle subsampling
     if (subsample == SUBSAMPLE_444) {
         cinfo.comp_info[0].h_samp_factor = 1;
         cinfo.comp_info[0].v_samp_factor = 1;
+        cinfo.comp_info[1].h_samp_factor = 1;
+        cinfo.comp_info[1].v_samp_factor = 1;
+        cinfo.comp_info[2].h_samp_factor = 1;
+        cinfo.comp_info[2].v_samp_factor = 1;
     }
-    
+
+    jpeg_set_quality(&cinfo, quality, TRUE);
+
     jpeg_start_compress(&cinfo, TRUE);
-    
+
     // Write image
     while (cinfo.next_scanline < cinfo.image_height) {
         row_pointer[0] = &buf[cinfo.next_scanline * row_stride];
         (void) jpeg_write_scanlines(&cinfo, row_pointer, 1);
     }
-    
+
     jpeg_finish_compress(&cinfo);
     jpeg_destroy_compress(&cinfo);
-    
+
     return jpegSize;
 }
 
