@@ -40,6 +40,7 @@ typedef struct {
     int loops;
     jpegarchive_quality_t quality;
     jpegarchive_method_t method;
+    float target;  // Target metric value (0 = use quality preset)
 } jpegarchive_recompress_input_t;
 
 // Output structure for jpegarchive_recompress

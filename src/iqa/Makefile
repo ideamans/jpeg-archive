@@ -16,10 +16,10 @@ CC ?= gcc
 
 ifeq ($(RELEASE),1)
 OUTDIR=./build/release
-CFLAGS=-O2 -Wall
+CFLAGS=-O2 -Wall -fPIC
 else
 OUTDIR=./build/debug
-CFLAGS=-g -Wall
+CFLAGS=-g -Wall -fPIC
 endif
 
 OUT = $(OUTDIR)/libiqa.a

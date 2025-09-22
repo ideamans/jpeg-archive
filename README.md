@@ -146,6 +146,12 @@ libjpegarchive - Static Library
 - **Memory-based operations**: Work directly with memory buffers instead of files
 - **Performance**: 2-3x faster than calling CLI utilities
 - **Thread-safe**: Can be used in multi-threaded applications
+- **Safe error handling**: Returns error codes instead of terminating the process
+
+### Limitations
+- **CMYK not supported**: CMYK and YCCK color space JPEGs will return `JPEGARCHIVE_UNSUPPORTED` error
+- **RGB/Grayscale only**: Only supports RGB and Grayscale JPEGs
+- **SSIM only**: Currently only supports SSIM comparison method
 
 ### API Functions
 
