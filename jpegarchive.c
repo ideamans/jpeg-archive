@@ -185,6 +185,45 @@ static unsigned long safeEncodeJpeg(unsigned char **jpeg, unsigned char *buf, in
     return jpegSize;
 }
 
+// Helper function to detect original subsampling from JPEG buffer
+static int detect_original_subsampling(const unsigned char *buf, unsigned long bufSize) {
+    struct jpeg_decompress_struct cinfo;
+    struct jpegarchive_error_mgr jerr;
+
+    // Set up error handling
+    cinfo.err = jpeg_std_error(&jerr.pub);
+    jerr.pub.error_exit = jpegarchive_error_exit;
+
+    // Establish the setjmp return context
+    if (setjmp(jerr.setjmp_buffer)) {
+        // If we get here, libjpeg encountered an error
+        jpeg_destroy_decompress(&cinfo);
+        return SUBSAMPLE_DEFAULT;  // Default on error
+    }
+
+    jpeg_create_decompress(&cinfo);
+    jpeg_mem_src(&cinfo, (unsigned char *)buf, bufSize);
+
+    // Read header to get component info
+    jpeg_read_header(&cinfo, TRUE);
+
+    // Detect subsampling from component info
+    int subsample = SUBSAMPLE_DEFAULT;
+
+    if (cinfo.num_components == 3 && cinfo.jpeg_color_space == JCS_YCbCr) {
+        // Check if all components have same sampling factors (4:4:4)
+        if (cinfo.comp_info[0].h_samp_factor == 1 && cinfo.comp_info[0].v_samp_factor == 1 &&
+            cinfo.comp_info[1].h_samp_factor == 1 && cinfo.comp_info[1].v_samp_factor == 1 &&
+            cinfo.comp_info[2].h_samp_factor == 1 && cinfo.comp_info[2].v_samp_factor == 1) {
+            subsample = SUBSAMPLE_444;
+        }
+        // Default is 4:2:0 or 4:2:2
+    }
+
+    jpeg_destroy_decompress(&cinfo);
+    return subsample;
+}
+
 // Helper function to convert quality preset to target value
 static float get_target_from_preset(jpegarchive_quality_t preset, jpegarchive_method_t method) {
     if (method == JPEGARCHIVE_METHOD_SSIM) {
@@ -276,7 +315,23 @@ jpegarchive_recompress_output_t jpegarchive_recompress(jpegarchive_recompress_in
     
     // Get metadata for preservation (without comment check)
     getMetadata(input.jpeg, input.length, &metaBuf, &metaSize, NULL);
-    
+
+    // Determine subsampling method to use
+    int subsample_method = SUBSAMPLE_DEFAULT;  // Default to 4:2:0
+
+    // Validate input.subsample value and use default if invalid
+    if (input.subsample == JPEGARCHIVE_SUBSAMPLE_420) {
+        subsample_method = SUBSAMPLE_DEFAULT;  // Force 4:2:0
+    } else if (input.subsample == JPEGARCHIVE_SUBSAMPLE_KEEP) {
+        // Keep original subsampling
+        subsample_method = detect_original_subsampling(input.jpeg, input.length);
+    } else if (input.subsample == JPEGARCHIVE_SUBSAMPLE_444) {
+        subsample_method = SUBSAMPLE_444;  // Force 4:4:4
+    } else {
+        // Invalid value, use default
+        subsample_method = SUBSAMPLE_DEFAULT;
+    }
+
     // Binary search for optimal quality
     unsigned char *compressed = NULL;
     unsigned long compressedSize = 0;
@@ -300,7 +355,7 @@ jpegarchive_recompress_output_t jpegarchive_recompress(jpegarchive_recompress_in
         int progressive = (attempt == 0) ? 1 : 0;
         int optimize = (attempt == 0) ? 1 : 0;
         jpegarchive_error_code_t encode_error;
-        compressedSize = safeEncodeJpeg(&compressed, original, width, height, JCS_RGB, quality, progressive, optimize, SUBSAMPLE_DEFAULT, &encode_error);
+        compressedSize = safeEncodeJpeg(&compressed, original, width, height, JCS_RGB, quality, progressive, optimize, subsample_method, &encode_error);
         
         if (!compressedSize) {
             free(original);
