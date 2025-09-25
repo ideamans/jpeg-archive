@@ -31,6 +31,13 @@ typedef enum {
     JPEGARCHIVE_QUALITY_VERYHIGH
 } jpegarchive_quality_t;
 
+// Subsample method
+typedef enum {
+    JPEGARCHIVE_SUBSAMPLE_420 = 0,  // Force 4:2:0 subsampling
+    JPEGARCHIVE_SUBSAMPLE_KEEP = 1, // Keep original image's subsampling
+    JPEGARCHIVE_SUBSAMPLE_444 = 2   // Force 4:4:4 (no subsampling)
+} jpegarchive_subsample_t;
+
 // Input structure for jpegarchive_recompress
 typedef struct {
     const unsigned char *jpeg;
@@ -41,6 +48,7 @@ typedef struct {
     jpegarchive_quality_t quality;
     jpegarchive_method_t method;
     float target;  // Target metric value (0 = use quality preset)
+    jpegarchive_subsample_t subsample;  // Subsampling method
 } jpegarchive_recompress_input_t;
 
 // Output structure for jpegarchive_recompress
