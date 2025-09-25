@@ -242,6 +242,7 @@ static int test_recompress_case(const char *test_file,
     const char *exe_path = "../jpeg-recompress";
     const char *exe_ext = "";
 #ifdef _WIN32
+    exe_path = "..\\jpeg-recompress";
     exe_ext = ".exe";
 #endif
 
