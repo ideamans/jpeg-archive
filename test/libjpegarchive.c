@@ -476,14 +476,23 @@ static int test_subsample(void) {
         int skip_if_unsuitable;  // Skip test if JPEGARCHIVE_NOT_SUITABLE error
     } test_cases[] = {
         // For small images, mozjpeg always uses 4:4:4, so we expect 4:4:4 in output
-        {"Force 4:2:0 on small image (mozjpeg uses 4:4:4)", "/tmp/test_420_source.jpg", JPEGARCHIVE_SUBSAMPLE_420, 1, 1},
-        {"Force 4:2:0 on small image (mozjpeg uses 4:4:4)", "/tmp/test_444_source.jpg", JPEGARCHIVE_SUBSAMPLE_420, 1, 1},
-        {"Keep original on small image (4:4:4)", "/tmp/test_420_source.jpg", JPEGARCHIVE_SUBSAMPLE_KEEP, 1, 0},
-        {"Keep original on small image (4:4:4)", "/tmp/test_444_source.jpg", JPEGARCHIVE_SUBSAMPLE_KEEP, 1, 0},
-        {"Force 4:4:4 on small image (already 4:4:4)", "/tmp/test_420_source.jpg", JPEGARCHIVE_SUBSAMPLE_444, 1, 0},
-        {"Force 4:4:4 on small image (already 4:4:4)", "/tmp/test_444_source.jpg", JPEGARCHIVE_SUBSAMPLE_444, 1, 0},
-        {"Invalid value (99) defaults to 4:2:0 (but mozjpeg uses 4:4:4)", "/tmp/test_420_source.jpg", (jpegarchive_subsample_t)99, 1, 1},
+        {"Force 4:2:0 on small image (mozjpeg uses 4:4:4)", NULL, JPEGARCHIVE_SUBSAMPLE_420, 1, 1},
+        {"Force 4:2:0 on small image (mozjpeg uses 4:4:4)", NULL, JPEGARCHIVE_SUBSAMPLE_420, 1, 1},
+        {"Keep original on small image (4:4:4)", NULL, JPEGARCHIVE_SUBSAMPLE_KEEP, 1, 0},
+        {"Keep original on small image (4:4:4)", NULL, JPEGARCHIVE_SUBSAMPLE_KEEP, 1, 0},
+        {"Force 4:4:4 on small image (already 4:4:4)", NULL, JPEGARCHIVE_SUBSAMPLE_444, 1, 0},
+        {"Force 4:4:4 on small image (already 4:4:4)", NULL, JPEGARCHIVE_SUBSAMPLE_444, 1, 0},
+        {"Invalid value (99) defaults to 4:2:0 (but mozjpeg uses 4:4:4)", NULL, (jpegarchive_subsample_t)99, 1, 1},
     };
+
+    // Set the actual file paths
+    test_cases[0].input_file = jpg_420_file;
+    test_cases[1].input_file = jpg_444_file;
+    test_cases[2].input_file = jpg_420_file;
+    test_cases[3].input_file = jpg_444_file;
+    test_cases[4].input_file = jpg_420_file;
+    test_cases[5].input_file = jpg_444_file;
+    test_cases[6].input_file = jpg_420_file;
 
     int num_tests = sizeof(test_cases) / sizeof(test_cases[0]);
 
@@ -534,7 +543,11 @@ static int test_subsample(void) {
 
         // Write output to temporary file
         char temp_output[256];
+#ifdef _WIN32
+        snprintf(temp_output, sizeof(temp_output), "test_subsample_output_%d.jpg", i);
+#else
         snprintf(temp_output, sizeof(temp_output), "/tmp/test_subsample_output_%d.jpg", i);
+#endif
         FILE *f = fopen(temp_output, "wb");
         if (!f) {
             printf("  ERROR: Failed to write output file\n");
@@ -566,9 +579,9 @@ static int test_subsample(void) {
     }
 
     // Clean up test files
-    unlink("/tmp/test_subsample.ppm");
-    unlink("/tmp/test_420_source.jpg");
-    unlink("/tmp/test_444_source.jpg");
+    unlink(ppm_file);
+    unlink(jpg_420_file);
+    unlink(jpg_444_file);
 
     printf("\nSubsample tests completed with %d errors\n", total_errors);
     return total_errors;
