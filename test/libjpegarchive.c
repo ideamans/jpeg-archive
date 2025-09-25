@@ -425,7 +425,22 @@ static int test_subsample(void) {
 
     // Create a test image with cjpeg
     printf("Creating test image...\n");
-    FILE *ppm = fopen("/tmp/test_subsample.ppm", "w");
+
+    // Use temp directory that works on both Unix and Windows
+    char ppm_file[256];
+    char jpg_420_file[256];
+    char jpg_444_file[256];
+#ifdef _WIN32
+    snprintf(ppm_file, sizeof(ppm_file), "test_subsample.ppm");
+    snprintf(jpg_420_file, sizeof(jpg_420_file), "test_420_source.jpg");
+    snprintf(jpg_444_file, sizeof(jpg_444_file), "test_444_source.jpg");
+#else
+    snprintf(ppm_file, sizeof(ppm_file), "/tmp/test_subsample.ppm");
+    snprintf(jpg_420_file, sizeof(jpg_420_file), "/tmp/test_420_source.jpg");
+    snprintf(jpg_444_file, sizeof(jpg_444_file), "/tmp/test_444_source.jpg");
+#endif
+
+    FILE *ppm = fopen(ppm_file, "w");
     if (!ppm) {
         printf("  ERROR: Failed to create test PPM file\n");
         return 1;
@@ -441,10 +456,14 @@ static int test_subsample(void) {
 
     // Convert to JPEG with 4:2:0 subsampling (default)
     // Note: mozjpeg will actually produce 4:4:4 for this small solid color image
-    system("../deps/built/mozjpeg/bin/cjpeg -quality 90 /tmp/test_subsample.ppm > /tmp/test_420_source.jpg 2>/dev/null");
+    char cmd_420[512];
+    snprintf(cmd_420, sizeof(cmd_420), "../deps/built/mozjpeg/bin/cjpeg -quality 90 %s > %s 2>/dev/null", ppm_file, jpg_420_file);
+    system(cmd_420);
 
     // Convert to JPEG with 4:4:4 subsampling
-    system("../deps/built/mozjpeg/bin/cjpeg -quality 90 -sample 1x1 /tmp/test_subsample.ppm > /tmp/test_444_source.jpg 2>/dev/null");
+    char cmd_444[512];
+    snprintf(cmd_444, sizeof(cmd_444), "../deps/built/mozjpeg/bin/cjpeg -quality 90 -sample 1x1 %s > %s 2>/dev/null", ppm_file, jpg_444_file);
+    system(cmd_444);
 
     // Test cases
     // Note: For small solid color images, mozjpeg optimizes to 4:4:4 regardless of settings
