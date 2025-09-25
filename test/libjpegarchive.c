@@ -456,14 +456,40 @@ static int test_subsample(void) {
 
     // Convert to JPEG with 4:2:0 subsampling (default)
     // Note: mozjpeg will actually produce 4:4:4 for this small solid color image
-    char cmd_420[512];
-    snprintf(cmd_420, sizeof(cmd_420), "../deps/built/mozjpeg/bin/cjpeg -quality 90 %s > %s 2>/dev/null", ppm_file, jpg_420_file);
-    system(cmd_420);
+    char cmd_420[1024];
+#ifdef _WIN32
+    // On Windows, cjpeg.exe should be in deps/built/mozjpeg/bin/
+    snprintf(cmd_420, sizeof(cmd_420), "..\\deps\\built\\mozjpeg\\bin\\cjpeg.exe -quality 90 \"%s\" > \"%s\" 2>NUL", ppm_file, jpg_420_file);
+#else
+    // Use mozjpeg's cjpeg on all platforms for consistency
+    snprintf(cmd_420, sizeof(cmd_420), "../deps/built/mozjpeg/bin/cjpeg -quality 90 \"%s\" > \"%s\" 2>/dev/null", ppm_file, jpg_420_file);
+#endif
+    int ret420 = system(cmd_420);
+
+    if (ret420 != 0) {
+        printf("  ERROR: Failed to create test JPEG with cjpeg (return code: %d)\n", ret420);
+        printf("  Command was: %s\n", cmd_420);
+        unlink(ppm_file);
+        return 1;
+    }
 
     // Convert to JPEG with 4:4:4 subsampling
-    char cmd_444[512];
-    snprintf(cmd_444, sizeof(cmd_444), "../deps/built/mozjpeg/bin/cjpeg -quality 90 -sample 1x1 %s > %s 2>/dev/null", ppm_file, jpg_444_file);
-    system(cmd_444);
+    char cmd_444[1024];
+#ifdef _WIN32
+    snprintf(cmd_444, sizeof(cmd_444), "..\\deps\\built\\mozjpeg\\bin\\cjpeg.exe -quality 90 -sample 1x1 \"%s\" > \"%s\" 2>NUL", ppm_file, jpg_444_file);
+#else
+    // Use mozjpeg's cjpeg on all platforms for consistency
+    snprintf(cmd_444, sizeof(cmd_444), "../deps/built/mozjpeg/bin/cjpeg -quality 90 -sample 1x1 \"%s\" > \"%s\" 2>/dev/null", ppm_file, jpg_444_file);
+#endif
+    int ret444 = system(cmd_444);
+
+    if (ret444 != 0) {
+        printf("  ERROR: Failed to create test JPEG with cjpeg -sample 1x1 (return code: %d)\n", ret444);
+        printf("  Command was: %s\n", cmd_444);
+        unlink(ppm_file);
+        unlink(jpg_420_file);
+        return 1;
+    }
 
     // Test cases
     // Note: For small solid color images, mozjpeg optimizes to 4:4:4 regardless of settings
