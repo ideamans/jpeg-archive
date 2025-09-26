@@ -55,15 +55,23 @@ static unsigned long safeDecodeJpeg(unsigned char *buf, unsigned long bufSize, u
         *error = JPEGARCHIVE_UNSUPPORTED;
         return 0;
     }
-    
+
     // Check if conversion is possible
-    if (pixelFormat == JCS_RGB && cinfo.jpeg_color_space != JCS_RGB && 
+    if (pixelFormat == JCS_RGB && cinfo.jpeg_color_space != JCS_RGB &&
         cinfo.jpeg_color_space != JCS_YCbCr && cinfo.jpeg_color_space != JCS_GRAYSCALE) {
         jpeg_destroy_decompress(&cinfo);
         *error = JPEGARCHIVE_UNSUPPORTED;
         return 0;
     }
-    
+
+    // Check if grayscale conversion is possible
+    if (pixelFormat == JCS_GRAYSCALE && cinfo.jpeg_color_space != JCS_RGB &&
+        cinfo.jpeg_color_space != JCS_YCbCr && cinfo.jpeg_color_space != JCS_GRAYSCALE) {
+        jpeg_destroy_decompress(&cinfo);
+        *error = JPEGARCHIVE_UNSUPPORTED;
+        return 0;
+    }
+
     cinfo.out_color_space = pixelFormat;
     
     // Start decompression
@@ -160,13 +168,28 @@ static unsigned long safeEncodeJpeg(unsigned char **jpeg, unsigned char *buf, in
     }
 
     // Handle subsampling
-    if (subsample == SUBSAMPLE_444) {
-        cinfo.comp_info[0].h_samp_factor = 1;
-        cinfo.comp_info[0].v_samp_factor = 1;
-        cinfo.comp_info[1].h_samp_factor = 1;
-        cinfo.comp_info[1].v_samp_factor = 1;
-        cinfo.comp_info[2].h_samp_factor = 1;
-        cinfo.comp_info[2].v_samp_factor = 1;
+    if (cinfo.input_components == 3 && cinfo.in_color_space == JCS_RGB) {
+        // Set default sampling factors based on libjpeg's defaults
+        jpeg_set_colorspace(&cinfo, JCS_YCbCr);
+
+        if (subsample == SUBSAMPLE_444) {
+            // 4:4:4 - no subsampling
+            cinfo.comp_info[0].h_samp_factor = 1;
+            cinfo.comp_info[0].v_samp_factor = 1;
+            cinfo.comp_info[1].h_samp_factor = 1;
+            cinfo.comp_info[1].v_samp_factor = 1;
+            cinfo.comp_info[2].h_samp_factor = 1;
+            cinfo.comp_info[2].v_samp_factor = 1;
+        } else if (subsample == SUBSAMPLE_422) {
+            // 4:2:2 - horizontal subsampling
+            cinfo.comp_info[0].h_samp_factor = 2;
+            cinfo.comp_info[0].v_samp_factor = 1;
+            cinfo.comp_info[1].h_samp_factor = 1;
+            cinfo.comp_info[1].v_samp_factor = 1;
+            cinfo.comp_info[2].h_samp_factor = 1;
+            cinfo.comp_info[2].v_samp_factor = 1;
+        }
+        // else SUBSAMPLE_DEFAULT (4:2:0) - use libjpeg's defaults
     }
 
     jpeg_set_quality(&cinfo, quality, TRUE);
@@ -211,13 +234,30 @@ static int detect_original_subsampling(const unsigned char *buf, unsigned long b
     int subsample = SUBSAMPLE_DEFAULT;
 
     if (cinfo.num_components == 3 && cinfo.jpeg_color_space == JCS_YCbCr) {
-        // Check if all components have same sampling factors (4:4:4)
-        if (cinfo.comp_info[0].h_samp_factor == 1 && cinfo.comp_info[0].v_samp_factor == 1 &&
-            cinfo.comp_info[1].h_samp_factor == 1 && cinfo.comp_info[1].v_samp_factor == 1 &&
-            cinfo.comp_info[2].h_samp_factor == 1 && cinfo.comp_info[2].v_samp_factor == 1) {
+        int h0 = cinfo.comp_info[0].h_samp_factor;
+        int v0 = cinfo.comp_info[0].v_samp_factor;
+        int h1 = cinfo.comp_info[1].h_samp_factor;
+        int v1 = cinfo.comp_info[1].v_samp_factor;
+        int h2 = cinfo.comp_info[2].h_samp_factor;
+        int v2 = cinfo.comp_info[2].v_samp_factor;
+
+        // Check for common subsampling patterns
+        if (h0 == 1 && v0 == 1 && h1 == 1 && v1 == 1 && h2 == 1 && v2 == 1) {
+            // 4:4:4 - no subsampling
             subsample = SUBSAMPLE_444;
+        } else if (h0 == 2 && v0 == 1 && h1 == 1 && v1 == 1 && h2 == 1 && v2 == 1) {
+            // 4:2:2 - horizontal subsampling
+            subsample = SUBSAMPLE_422;
+        } else if (h0 == 2 && v0 == 2 && h1 == 1 && v1 == 1 && h2 == 1 && v2 == 1) {
+            // 4:2:0 - both horizontal and vertical subsampling
+            subsample = SUBSAMPLE_DEFAULT;  // This is the default
+        } else if (h0 == 4 && v0 == 1 && h1 == 1 && v1 == 1 && h2 == 1 && v2 == 1) {
+            // 4:1:1 - convert to 4:2:0 for better compatibility
+            subsample = SUBSAMPLE_DEFAULT;  // Use 4:2:0 instead of 4:1:1
+        } else {
+            // Unknown or uncommon pattern, use default
+            subsample = SUBSAMPLE_DEFAULT;
         }
-        // Default is 4:2:0 or 4:2:2
     }
 
     jpeg_destroy_decompress(&cinfo);

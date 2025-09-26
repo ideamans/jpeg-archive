@@ -25,7 +25,11 @@ enum SUBSAMPLING_METHOD {
     SUBSAMPLE_DEFAULT,
     // Using 4:4:4 is more detailed and will prevent fine text
     // from getting blurry (e.g. screenshots)
-    SUBSAMPLE_444
+    SUBSAMPLE_444,
+    // 4:2:2 - horizontal subsampling only
+    SUBSAMPLE_422,
+    // 4:1:1 - high horizontal subsampling
+    SUBSAMPLE_411
 };
 
 enum filetype {

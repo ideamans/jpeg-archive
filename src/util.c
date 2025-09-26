@@ -185,13 +185,26 @@ unsigned long encodeJpeg(unsigned char **jpeg, unsigned char *buf, int width, in
         jpeg_simple_progression(&cinfo);
     }
 
-    if (subsample == SUBSAMPLE_444) {
-        cinfo.comp_info[0].h_samp_factor = 1;
-        cinfo.comp_info[0].v_samp_factor = 1;
-        cinfo.comp_info[1].h_samp_factor = 1;
-        cinfo.comp_info[1].v_samp_factor = 1;
-        cinfo.comp_info[2].h_samp_factor = 1;
-        cinfo.comp_info[2].v_samp_factor = 1;
+    // Handle subsampling for color images
+    if (cinfo.input_components == 3 && cinfo.in_color_space == JCS_RGB) {
+        if (subsample == SUBSAMPLE_444) {
+            // 4:4:4 - no subsampling
+            cinfo.comp_info[0].h_samp_factor = 1;
+            cinfo.comp_info[0].v_samp_factor = 1;
+            cinfo.comp_info[1].h_samp_factor = 1;
+            cinfo.comp_info[1].v_samp_factor = 1;
+            cinfo.comp_info[2].h_samp_factor = 1;
+            cinfo.comp_info[2].v_samp_factor = 1;
+        } else if (subsample == SUBSAMPLE_422) {
+            // 4:2:2 - horizontal subsampling
+            cinfo.comp_info[0].h_samp_factor = 2;
+            cinfo.comp_info[0].v_samp_factor = 1;
+            cinfo.comp_info[1].h_samp_factor = 1;
+            cinfo.comp_info[1].v_samp_factor = 1;
+            cinfo.comp_info[2].h_samp_factor = 1;
+            cinfo.comp_info[2].v_samp_factor = 1;
+        }
+        // else SUBSAMPLE_DEFAULT (4:2:0) - use mozjpeg defaults
     }
 
     jpeg_set_quality(&cinfo, quality, TRUE);

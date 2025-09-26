@@ -40,7 +40,20 @@ if [ -f "../jpeg-recompress.exe" ]; then
 fi
 
 for file in test-files/*; do
-    "$JPEG_RECOMPRESS" "$file" "test-output/$(basename "$file")"
+    # Skip directories and non-JPEG files
+    if [ -d "$file" ]; then
+        continue
+    fi
+
+    # Only process .jpg and .jpeg files
+    case "$file" in
+        *.jpg|*.jpeg|*.JPG|*.JPEG)
+            "$JPEG_RECOMPRESS" "$file" "test-output/$(basename "$file")"
+            ;;
+        *)
+            echo "Skipping non-JPEG file: $file"
+            ;;
+    esac
 done
 
 # Run libjpegarchive tests

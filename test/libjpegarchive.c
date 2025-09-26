@@ -574,6 +574,10 @@ int main(int argc, char **argv) {
 
     while ((entry = readdir(dir)) != NULL && num_files < 10) {
         if (strstr(entry->d_name, ".jpg")) {
+            // Skip example.jpg as it's too small for meaningful tests
+            if (strcmp(entry->d_name, "example.jpg") == 0) {
+                continue;
+            }
             snprintf(test_files[num_files], sizeof(test_files[num_files]), "test-files/%s", entry->d_name);
             num_files++;
         }

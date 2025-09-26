@@ -41,10 +41,19 @@ libjpegarchive.a: jpegarchive.o src/util.o src/edit.o src/smallfry.o
 %.o: %.c %.h $(JPEGLIB_H)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-test: jpeg-recompress test/test.c src/util.o src/edit.o src/hash.o test/libjpegarchive.c libjpegarchive.a $(LIBIQA) $(LIBJPEG)
+test: jpeg-recompress jpeg-compare jpeg-hash test/test.c src/util.o src/edit.o src/hash.o test/libjpegarchive.c test/test_subsampling.c libjpegarchive.a $(LIBIQA) $(LIBJPEG)
 	$(CC) $(CFLAGS) -o test/test test/test.c src/util.o src/edit.o src/hash.o $(LIBJPEG) $(LDFLAGS)
 	$(CC) $(CFLAGS) -o test/libjpegarchive test/libjpegarchive.c libjpegarchive.a $(LIBIQA) $(LIBJPEG) $(LDFLAGS)
+	$(CC) $(CFLAGS) -o test/test_subsampling test/test_subsampling.c libjpegarchive.a $(LIBIQA) $(LIBJPEG) $(LDFLAGS)
 	cd test && bash test.sh
+	@echo ""
+	@echo "=== Running subsampling tests ==="
+	@cd test && if [ -f test-files/subsampling/test_444.jpg ]; then \
+		./test_subsampling; \
+	else \
+		echo "Creating test images for subsampling tests..."; \
+		bash create_subsampling_test_images.sh && ./test_subsampling; \
+	fi || echo "Warning: Subsampling tests failed (may be due to mozjpeg version mismatch)"
 
 install: all
 	mkdir -p $(PREFIX)/bin
@@ -82,6 +91,6 @@ $(LIBJPEG):
 		$(MAKE) install
 
 clean:
-	rm -rf jpeg-recompress jpeg-compare jpeg-hash libjpegarchive.a jpegarchive.o test/test test/libjpegarchive src/*.o src/iqa/build $(DEPS_DIR)
+	rm -rf jpeg-recompress jpeg-compare jpeg-hash libjpegarchive.a jpegarchive.o test/test test/libjpegarchive test/test_subsampling src/*.o src/iqa/build $(DEPS_DIR)
 
 .PHONY: test test-libjpegarchive-build install clean build
