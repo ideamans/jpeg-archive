@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <setjmp.h>
+#include <math.h>
 #include <jpeglib.h>
 
 // Custom error handler for libjpeg to prevent process termination
@@ -354,7 +355,14 @@ jpegarchive_recompress_output_t jpegarchive_recompress(jpegarchive_recompress_in
     }
     
     // Get metadata for preservation (without comment check)
-    getMetadata(input.jpeg, input.length, &metaBuf, &metaSize, NULL);
+    int metaResult = getMetadata(input.jpeg, input.length, &metaBuf, &metaSize, NULL);
+    if (metaResult < 0) {
+        // Metadata allocation failed
+        free(original);
+        free(originalGray);
+        output.error_code = JPEGARCHIVE_MEMORY_ERROR;
+        return output;
+    }
 
     // Determine subsampling method to use
     int subsample_method = SUBSAMPLE_DEFAULT;  // Default to 4:2:0
@@ -424,8 +432,18 @@ jpegarchive_recompress_output_t jpegarchive_recompress(jpegarchive_recompress_in
         float metric = 0;
         if (input.method == JPEGARCHIVE_METHOD_SSIM) {
             metric = iqa_ssim(originalGray, compressedGray, width, height, width, 0, 0);
+            // Check for SSIM calculation failure (returns INFINITY on error)
+            if (metric == INFINITY || metric != metric) {  // NaN check
+                free(compressed);
+                free(compressedGray);
+                free(original);
+                free(originalGray);
+                if (metaBuf) free(metaBuf);
+                output.error_code = JPEGARCHIVE_MEMORY_ERROR;
+                return output;
+            }
         }
-        
+
         finalQuality = quality;
         finalMetric = metric;
         
@@ -580,11 +598,18 @@ jpegarchive_compare_output_t jpegarchive_compare(jpegarchive_compare_input_t inp
     double metric = 0;
     if (input.method == JPEGARCHIVE_METHOD_SSIM) {
         metric = iqa_ssim(image1, image2, width1, height1, width1, 0, 0);
+        // Check for SSIM calculation failure (returns INFINITY on error)
+        if (metric == INFINITY || metric != metric) {  // NaN check
+            free(image1);
+            free(image2);
+            output.error_code = JPEGARCHIVE_MEMORY_ERROR;
+            return output;
+        }
     }
-    
+
     free(image1);
     free(image2);
-    
+
     output.error_code = JPEGARCHIVE_OK;
     output.metric = metric;
     

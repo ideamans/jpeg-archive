@@ -67,6 +67,10 @@ long grayscale(const unsigned char *input, unsigned char **output, int width, in
     int stride = width * 3;
 
     *output = malloc(width * height);
+    if (*output == NULL) {
+        // Malloc failed
+        return 0;
+    }
 
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {

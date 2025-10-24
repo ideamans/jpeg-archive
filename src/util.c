@@ -339,6 +339,10 @@ int getMetadata(const unsigned char *buf, unsigned int bufSize, unsigned char **
 
     // Read through all the file markers
     while (pos < bufSize && count < 20) {
+        // Ensure we have at least 2 bytes for marker
+        if (pos + 1 >= bufSize) {
+            break;
+        }
         unsigned int marker = (buf[pos] << 8) + buf[pos + 1];
 
         //printf("Marker %x at %u\n", marker, pos);
@@ -351,13 +355,23 @@ int getMetadata(const unsigned char *buf, unsigned int bufSize, unsigned char **
         } else if (marker >= 0xffd0 && marker <= 0xffd9 /* RST0+x */) {
             pos += 2;
         } else {
+            // Ensure we have at least 4 bytes for marker + size
+            if (pos + 3 >= bufSize) {
+                break;
+            }
             // Marker has a custom size, read it in
             int size = (buf[pos + 2] << 8) + buf[pos + 3];
             //printf("Size is %i (%x)\n", size, size);
 
             // Save APP0+x and COM markers
             if ((marker >= 0xffe1 && marker <= 0xffef) || marker == 0xfffe) {
-                if (marker == 0xfffe && comment != NULL && !strncmp(comment, (char *) buf + pos + 4, strlen(comment))) {
+                // Check if we have enough bytes to read the comment
+                size_t comment_len = comment ? strlen(comment) : 0;
+                if (marker == 0xfffe && comment != NULL && pos + 4 + comment_len <= bufSize &&
+                    !strncmp(comment, (char *) buf + pos + 4, comment_len)) {
+                    // Initialize output parameters before early return
+                    *meta = NULL;
+                    *metaSize = 0;
                     return 1;
                 }
 
@@ -373,6 +387,11 @@ int getMetadata(const unsigned char *buf, unsigned int bufSize, unsigned char **
 
     // Allocate the metadata buffer
     *meta = malloc(totalSize);
+    if (*meta == NULL && totalSize > 0) {
+        // Malloc failed
+        *metaSize = 0;
+        return -1;  // Return error code for allocation failure
+    }
     *metaSize = totalSize;
 
     // Copy over all the metadata into the new buffer
