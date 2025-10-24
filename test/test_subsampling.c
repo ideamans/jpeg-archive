@@ -2,6 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <jpeglib.h>
+
+#ifdef _WIN32
+#include <io.h>
+#include <direct.h>
+#define access _access
+#endif
+
 #include "../jpegarchive.h"
 
 // Function to detect subsampling from JPEG file
@@ -114,7 +121,11 @@ int test_subsampling_preservation(const char* input_file, const char* expected_s
            output.quality, output.metric, (long long)output.length);
 
     // Save output to temp file and check subsampling
+#ifdef _WIN32
+    const char* temp_file = "./test_output.jpg";
+#else
     const char* temp_file = "/tmp/test_output.jpg";
+#endif
     FILE *out = fopen(temp_file, "wb");
     fwrite(output.jpeg, 1, output.length, out);
     fclose(out);
@@ -186,7 +197,11 @@ int main() {
 
         if (output.error_code == JPEGARCHIVE_OK || output.error_code == JPEGARCHIVE_NOT_SUITABLE) {
             if (output.error_code == JPEGARCHIVE_OK) {
+#ifdef _WIN32
+                const char* temp_file = "./test_411_output.jpg";
+#else
                 const char* temp_file = "/tmp/test_411_output.jpg";
+#endif
                 FILE *out = fopen(temp_file, "wb");
                 fwrite(output.jpeg, 1, output.length, out);
                 fclose(out);

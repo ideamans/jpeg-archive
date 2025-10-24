@@ -10,6 +10,16 @@
 #include <jpeglib.h>
 #include <setjmp.h>
 
+#ifdef _WIN32
+#include <io.h>
+#include <direct.h>
+#define access _access
+#define getcwd _getcwd
+#ifndef PATH_MAX
+#define PATH_MAX 260
+#endif
+#endif
+
 #include "../jpegarchive.h"
 
 typedef struct {
@@ -239,17 +249,26 @@ static int test_recompress_case(const char *test_file,
     snprintf(temp_output, sizeof(temp_output), "/tmp/test_output_%d.jpg", getpid());
 #endif
 
-    const char *exe_path = "../jpeg-recompress";
-    const char *exe_ext = "";
+    char exe_path[512];
 #ifdef _WIN32
-    exe_ext = ".exe";
+    // Use absolute path on Windows to avoid '../' parsing issues
+    _fullpath(exe_path, "../jpeg-recompress.exe", sizeof(exe_path));
+    if (access(exe_path, 0) != 0) {
+        // Fallback: try in current directory
+        strcpy(exe_path, ".\\jpeg-recompress.exe");
+        if (access(exe_path, 0) != 0) {
+            // Fallback: try without path
+            strcpy(exe_path, "jpeg-recompress.exe");
+        }
+    }
+#else
+    strcpy(exe_path, "../jpeg-recompress");
 #endif
 
     char cli_command[512];
     snprintf(cli_command, sizeof(cli_command),
-             "%s%s -q %s -n %d -x %d -l %d %s %s 2>&1",
+             "%s -q %s -n %d -x %d -l %d %s %s 2>&1",
              exe_path,
-             exe_ext,
              case_def->cli_quality,
              case_def->min,
              case_def->max,
@@ -372,15 +391,23 @@ static int test_compare(const char *file1, const char *file2) {
         return 1;
     }
 
-    const char *exe_ext = "";
+    char compare_exe[512];
 #ifdef _WIN32
-    exe_ext = ".exe";
+    _fullpath(compare_exe, "../jpeg-compare.exe", sizeof(compare_exe));
+    if (access(compare_exe, 0) != 0) {
+        strcpy(compare_exe, ".\\jpeg-compare.exe");
+        if (access(compare_exe, 0) != 0) {
+            strcpy(compare_exe, "jpeg-compare.exe");
+        }
+    }
+#else
+    strcpy(compare_exe, "../jpeg-compare");
 #endif
 
     char cli_command[512];
     snprintf(cli_command, sizeof(cli_command),
-             "../jpeg-compare%s -m ssim %s %s 2>&1",
-             exe_ext, file1, file2);
+             "%s -m ssim %s %s 2>&1",
+             compare_exe, file1, file2);
 
     long long cli_start = get_time_us();
     char cli_output[1024];
@@ -424,7 +451,23 @@ static int test_subsample(void) {
 
     // Create a test image with cjpeg
     printf("Creating test image...\n");
-    FILE *ppm = fopen("/tmp/test_subsample.ppm", "w");
+#ifdef _WIN32
+    const char *ppm_path = "./test_subsample.ppm";
+    const char *jpg_420_path = "./test_420_source.jpg";
+    const char *jpg_444_path = "./test_444_source.jpg";
+    char cjpeg_path[512];
+    _fullpath(cjpeg_path, "../deps/built/mozjpeg/bin/cjpeg.exe", sizeof(cjpeg_path));
+    if (access(cjpeg_path, 0) != 0) {
+        strcpy(cjpeg_path, "cjpeg.exe");
+    }
+#else
+    const char *ppm_path = "/tmp/test_subsample.ppm";
+    const char *jpg_420_path = "/tmp/test_420_source.jpg";
+    const char *jpg_444_path = "/tmp/test_444_source.jpg";
+    const char *cjpeg_path = "../deps/built/mozjpeg/bin/cjpeg";
+#endif
+
+    FILE *ppm = fopen(ppm_path, "w");
     if (!ppm) {
         printf("  ERROR: Failed to create test PPM file\n");
         return 1;
@@ -440,10 +483,17 @@ static int test_subsample(void) {
 
     // Convert to JPEG with 4:2:0 subsampling (default)
     // Note: mozjpeg will actually produce 4:4:4 for this small solid color image
-    system("../deps/built/mozjpeg/bin/cjpeg -quality 90 /tmp/test_subsample.ppm > /tmp/test_420_source.jpg 2>/dev/null");
-
-    // Convert to JPEG with 4:4:4 subsampling
-    system("../deps/built/mozjpeg/bin/cjpeg -quality 90 -sample 1x1 /tmp/test_subsample.ppm > /tmp/test_444_source.jpg 2>/dev/null");
+    char cmd_420[1024];
+    char cmd_444[1024];
+#ifdef _WIN32
+    snprintf(cmd_420, sizeof(cmd_420), "\"%s\" -quality 90 \"%s\" > \"%s\" 2>nul", cjpeg_path, ppm_path, jpg_420_path);
+    snprintf(cmd_444, sizeof(cmd_444), "\"%s\" -quality 90 -sample 1x1 \"%s\" > \"%s\" 2>nul", cjpeg_path, ppm_path, jpg_444_path);
+#else
+    snprintf(cmd_420, sizeof(cmd_420), "%s -quality 90 %s > %s 2>/dev/null", cjpeg_path, ppm_path, jpg_420_path);
+    snprintf(cmd_444, sizeof(cmd_444), "%s -quality 90 -sample 1x1 %s > %s 2>/dev/null", cjpeg_path, ppm_path, jpg_444_path);
+#endif
+    system(cmd_420);
+    system(cmd_444);
 
     // Test cases
     // Note: For small solid color images, mozjpeg optimizes to 4:4:4 regardless of settings
@@ -456,16 +506,25 @@ static int test_subsample(void) {
         int skip_if_unsuitable;  // Skip test if JPEGARCHIVE_NOT_SUITABLE error
     } test_cases[] = {
         // For small images, mozjpeg always uses 4:4:4, so we expect 4:4:4 in output
-        {"Force 4:2:0 on small image (mozjpeg uses 4:4:4)", "/tmp/test_420_source.jpg", JPEGARCHIVE_SUBSAMPLE_420, 1, 1},
-        {"Force 4:2:0 on small image (mozjpeg uses 4:4:4)", "/tmp/test_444_source.jpg", JPEGARCHIVE_SUBSAMPLE_420, 1, 1},
-        {"Keep original on small image (4:4:4)", "/tmp/test_420_source.jpg", JPEGARCHIVE_SUBSAMPLE_KEEP, 1, 0},
-        {"Keep original on small image (4:4:4)", "/tmp/test_444_source.jpg", JPEGARCHIVE_SUBSAMPLE_KEEP, 1, 0},
-        {"Force 4:4:4 on small image (already 4:4:4)", "/tmp/test_420_source.jpg", JPEGARCHIVE_SUBSAMPLE_444, 1, 0},
-        {"Force 4:4:4 on small image (already 4:4:4)", "/tmp/test_444_source.jpg", JPEGARCHIVE_SUBSAMPLE_444, 1, 0},
-        {"Invalid value (99) defaults to 4:2:0 (but mozjpeg uses 4:4:4)", "/tmp/test_420_source.jpg", (jpegarchive_subsample_t)99, 1, 1},
+        {"Force 4:2:0 on small image (mozjpeg uses 4:4:4)", "", JPEGARCHIVE_SUBSAMPLE_420, 1, 1},
+        {"Force 4:2:0 on small image (mozjpeg uses 4:4:4)", "", JPEGARCHIVE_SUBSAMPLE_420, 1, 1},
+        {"Keep original on small image (4:4:4)", "", JPEGARCHIVE_SUBSAMPLE_KEEP, 1, 0},
+        {"Keep original on small image (4:4:4)", "", JPEGARCHIVE_SUBSAMPLE_KEEP, 1, 0},
+        {"Force 4:4:4 on small image (already 4:4:4)", "", JPEGARCHIVE_SUBSAMPLE_444, 1, 0},
+        {"Force 4:4:4 on small image (already 4:4:4)", "", JPEGARCHIVE_SUBSAMPLE_444, 1, 0},
+        {"Invalid value (99) defaults to 4:2:0 (but mozjpeg uses 4:4:4)", "", (jpegarchive_subsample_t)99, 1, 1},
     };
 
     int num_tests = sizeof(test_cases) / sizeof(test_cases[0]);
+
+    // Set input_file paths based on platform
+    test_cases[0].input_file = jpg_420_path;
+    test_cases[1].input_file = jpg_444_path;
+    test_cases[2].input_file = jpg_420_path;
+    test_cases[3].input_file = jpg_444_path;
+    test_cases[4].input_file = jpg_420_path;
+    test_cases[5].input_file = jpg_444_path;
+    test_cases[6].input_file = jpg_420_path;
 
     for (int i = 0; i < num_tests; i++) {
         printf("\nTest: %s\n", test_cases[i].name);

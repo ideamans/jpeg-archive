@@ -4,6 +4,13 @@
 #include <unistd.h>
 #include <jpeglib.h>
 #include <setjmp.h>
+
+#ifdef _WIN32
+#include <io.h>
+#include <direct.h>
+#define access _access
+#endif
+
 #include "../jpegarchive.h"
 
 // Error handler for libjpeg
@@ -99,9 +106,26 @@ int main() {
 
     int total_errors = 0;
 
+    // Set paths based on platform
+#ifdef _WIN32
+    const char *ppm_path = "./test_subsample.ppm";
+    const char *jpg_420_path = "./test_420_source.jpg";
+    const char *jpg_444_path = "./test_444_source.jpg";
+    char cjpeg_path[512];
+    _fullpath(cjpeg_path, "../deps/built/mozjpeg/bin/cjpeg.exe", sizeof(cjpeg_path));
+    if (access(cjpeg_path, 0) != 0) {
+        strcpy(cjpeg_path, "cjpeg.exe");
+    }
+#else
+    const char *ppm_path = "/tmp/test_subsample.ppm";
+    const char *jpg_420_path = "/tmp/test_420_source.jpg";
+    const char *jpg_444_path = "/tmp/test_444_source.jpg";
+    const char *cjpeg_path = "../deps/built/mozjpeg/bin/cjpeg";
+#endif
+
     // Create a test image with cjpeg
     printf("Creating test images...\n");
-    FILE *ppm = fopen("/tmp/test_subsample.ppm", "w");
+    FILE *ppm = fopen(ppm_path, "w");
     if (!ppm) {
         printf("  ERROR: Failed to create test PPM file\n");
         return 1;
@@ -116,11 +140,20 @@ int main() {
 
     // Convert to JPEG with 4:2:0 subsampling (default)
     printf("Creating 4:2:0 source image...\n");
-    system("../deps/built/mozjpeg/bin/cjpeg -quality 90 /tmp/test_subsample.ppm > /tmp/test_420_source.jpg 2>/dev/null");
+    char cmd_420[1024];
+    char cmd_444[1024];
+#ifdef _WIN32
+    snprintf(cmd_420, sizeof(cmd_420), "\"%s\" -quality 90 \"%s\" > \"%s\" 2>nul", cjpeg_path, ppm_path, jpg_420_path);
+    snprintf(cmd_444, sizeof(cmd_444), "\"%s\" -quality 90 -sample 1x1 \"%s\" > \"%s\" 2>nul", cjpeg_path, ppm_path, jpg_444_path);
+#else
+    snprintf(cmd_420, sizeof(cmd_420), "%s -quality 90 %s > %s 2>/dev/null", cjpeg_path, ppm_path, jpg_420_path);
+    snprintf(cmd_444, sizeof(cmd_444), "%s -quality 90 -sample 1x1 %s > %s 2>/dev/null", cjpeg_path, ppm_path, jpg_444_path);
+#endif
+    system(cmd_420);
 
     // Convert to JPEG with 4:4:4 subsampling
     printf("Creating 4:4:4 source image...\n");
-    system("../deps/built/mozjpeg/bin/cjpeg -quality 90 -sample 1x1 /tmp/test_subsample.ppm > /tmp/test_444_source.jpg 2>/dev/null");
+    system(cmd_444);
 
     // Test cases
     // Note: For small solid color images, mozjpeg optimizes to 4:4:4 regardless of settings
@@ -132,16 +165,25 @@ int main() {
         int skip_if_unsuitable;  // Skip test if JPEGARCHIVE_NOT_SUITABLE error
     } test_cases[] = {
         // For small images, mozjpeg always uses 4:4:4, so we expect 4:4:4 in output
-        {"Force 4:2:0 on small image (mozjpeg uses 4:4:4)", "/tmp/test_420_source.jpg", JPEGARCHIVE_SUBSAMPLE_420, 1, 1},
-        {"Force 4:2:0 on small image (mozjpeg uses 4:4:4)", "/tmp/test_444_source.jpg", JPEGARCHIVE_SUBSAMPLE_420, 1, 1},
-        {"Keep original on small image (4:4:4)", "/tmp/test_420_source.jpg", JPEGARCHIVE_SUBSAMPLE_KEEP, 1, 0},
-        {"Keep original on small image (4:4:4)", "/tmp/test_444_source.jpg", JPEGARCHIVE_SUBSAMPLE_KEEP, 1, 0},
-        {"Force 4:4:4 on small image (already 4:4:4)", "/tmp/test_420_source.jpg", JPEGARCHIVE_SUBSAMPLE_444, 1, 0},
-        {"Force 4:4:4 on small image (already 4:4:4)", "/tmp/test_444_source.jpg", JPEGARCHIVE_SUBSAMPLE_444, 1, 0},
-        {"Invalid value (99) defaults to 4:2:0 (but mozjpeg uses 4:4:4)", "/tmp/test_420_source.jpg", (jpegarchive_subsample_t)99, 1, 1},
+        {"Force 4:2:0 on small image (mozjpeg uses 4:4:4)", "", JPEGARCHIVE_SUBSAMPLE_420, 1, 1},
+        {"Force 4:2:0 on small image (mozjpeg uses 4:4:4)", "", JPEGARCHIVE_SUBSAMPLE_420, 1, 1},
+        {"Keep original on small image (4:4:4)", "", JPEGARCHIVE_SUBSAMPLE_KEEP, 1, 0},
+        {"Keep original on small image (4:4:4)", "", JPEGARCHIVE_SUBSAMPLE_KEEP, 1, 0},
+        {"Force 4:4:4 on small image (already 4:4:4)", "", JPEGARCHIVE_SUBSAMPLE_444, 1, 0},
+        {"Force 4:4:4 on small image (already 4:4:4)", "", JPEGARCHIVE_SUBSAMPLE_444, 1, 0},
+        {"Invalid value (99) defaults to 4:2:0 (but mozjpeg uses 4:4:4)", "", (jpegarchive_subsample_t)99, 1, 1},
     };
 
     int num_tests = sizeof(test_cases) / sizeof(test_cases[0]);
+
+    // Set input_file paths based on platform
+    test_cases[0].input_file = jpg_420_path;
+    test_cases[1].input_file = jpg_444_path;
+    test_cases[2].input_file = jpg_420_path;
+    test_cases[3].input_file = jpg_444_path;
+    test_cases[4].input_file = jpg_420_path;
+    test_cases[5].input_file = jpg_444_path;
+    test_cases[6].input_file = jpg_420_path;
 
     printf("\nRunning subsample tests...\n");
     printf("--------------------------\n");
