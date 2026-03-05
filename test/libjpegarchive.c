@@ -883,6 +883,279 @@ int main(int argc, char **argv) {
     int subsample_errors = test_subsample();
     total_errors += subsample_errors;
 
+    printf("\n=== Testing jpegarchive_encode_rgb ===\n");
+    {
+        // Test 1: Basic RGB encode
+        printf("Test: Basic RGB encode (16x16 red image, quality 80)...\n");
+        int w = 16, h = 16;
+        unsigned char *rgb = malloc(w * h * 3);
+        for (int i = 0; i < w * h; i++) {
+            rgb[i * 3 + 0] = 255; // R
+            rgb[i * 3 + 1] = 0;   // G
+            rgb[i * 3 + 2] = 0;   // B
+        }
+
+        jpegarchive_encode_rgb_input_t enc_input = {
+            .rgb = rgb,
+            .width = w,
+            .height = h,
+            .quality = 80,
+            .subsample = 0,  // SUBSAMPLE_DEFAULT (4:2:0)
+            .progressive = 0
+        };
+        jpegarchive_encode_rgb_output_t enc_output = jpegarchive_encode_rgb(enc_input);
+
+        if (enc_output.error_code != JPEGARCHIVE_OK) {
+            printf("  FAILED: error_code = %d\n", enc_output.error_code);
+            total_errors++;
+        } else if (enc_output.length <= 0 || enc_output.jpeg == NULL) {
+            printf("  FAILED: output is empty\n");
+            total_errors++;
+        } else {
+            // Verify output is valid JPEG (starts with FFD8)
+            if (enc_output.jpeg[0] == 0xFF && enc_output.jpeg[1] == 0xD8) {
+                printf("  PASSED: output is valid JPEG (%lld bytes)\n", (long long)enc_output.length);
+            } else {
+                printf("  FAILED: output does not start with JPEG SOI marker\n");
+                total_errors++;
+            }
+        }
+        jpegarchive_free_encode_rgb_output(&enc_output);
+
+        // Test 2: Encode with 4:4:4 and verify subsampling
+        printf("Test: RGB encode with 4:4:4 subsampling...\n");
+        enc_input.subsample = 1;  // SUBSAMPLE_444
+        enc_output = jpegarchive_encode_rgb(enc_input);
+
+        if (enc_output.error_code != JPEGARCHIVE_OK) {
+            printf("  FAILED: error_code = %d\n", enc_output.error_code);
+            total_errors++;
+        } else {
+            int detected = jpegarchive_detect_subsampling(enc_output.jpeg, enc_output.length);
+            // SUBSAMPLE_444 = 1
+            if (detected == 1) {
+                printf("  PASSED: detected 4:4:4 subsampling as expected\n");
+            } else {
+                printf("  FAILED: expected SUBSAMPLE_444 (1), got %d\n", detected);
+                total_errors++;
+            }
+        }
+        jpegarchive_free_encode_rgb_output(&enc_output);
+
+        // Test 3: Encode with progressive mode
+        printf("Test: RGB encode with progressive mode...\n");
+        enc_input.subsample = 0;  // SUBSAMPLE_DEFAULT
+        enc_input.progressive = 1;
+        enc_output = jpegarchive_encode_rgb(enc_input);
+
+        if (enc_output.error_code != JPEGARCHIVE_OK) {
+            printf("  FAILED: error_code = %d\n", enc_output.error_code);
+            total_errors++;
+        } else {
+            printf("  PASSED: progressive encode produced %lld bytes\n", (long long)enc_output.length);
+        }
+        jpegarchive_free_encode_rgb_output(&enc_output);
+
+        // Test 4: Invalid input (NULL rgb)
+        printf("Test: RGB encode with NULL input...\n");
+        jpegarchive_encode_rgb_input_t null_input = {
+            .rgb = NULL, .width = 16, .height = 16, .quality = 80,
+            .subsample = 0, .progressive = 0
+        };
+        enc_output = jpegarchive_encode_rgb(null_input);
+        if (enc_output.error_code == JPEGARCHIVE_INVALID_INPUT) {
+            printf("  PASSED: correctly returned INVALID_INPUT\n");
+        } else {
+            printf("  FAILED: expected INVALID_INPUT, got %d\n", enc_output.error_code);
+            total_errors++;
+        }
+        jpegarchive_free_encode_rgb_output(&enc_output);
+
+        // Test 5: Invalid input (zero dimensions)
+        printf("Test: RGB encode with zero width...\n");
+        jpegarchive_encode_rgb_input_t zero_input = {
+            .rgb = rgb, .width = 0, .height = 16, .quality = 80,
+            .subsample = 0, .progressive = 0
+        };
+        enc_output = jpegarchive_encode_rgb(zero_input);
+        if (enc_output.error_code == JPEGARCHIVE_INVALID_INPUT) {
+            printf("  PASSED: correctly returned INVALID_INPUT\n");
+        } else {
+            printf("  FAILED: expected INVALID_INPUT, got %d\n", enc_output.error_code);
+            total_errors++;
+        }
+        jpegarchive_free_encode_rgb_output(&enc_output);
+
+        // Test 6: Encode-then-compare round-trip
+        printf("Test: Encode then compare (round-trip)...\n");
+        enc_input.rgb = rgb;
+        enc_input.width = w;
+        enc_input.height = h;
+        enc_input.quality = 95;
+        enc_input.subsample = 0;  // SUBSAMPLE_DEFAULT
+        enc_input.progressive = 0;
+        jpegarchive_encode_rgb_output_t enc1 = jpegarchive_encode_rgb(enc_input);
+        jpegarchive_encode_rgb_output_t enc2 = jpegarchive_encode_rgb(enc_input);
+
+        if (enc1.error_code == JPEGARCHIVE_OK && enc2.error_code == JPEGARCHIVE_OK) {
+            jpegarchive_compare_input_t cmp_input = {
+                .jpeg1 = enc1.jpeg,
+                .jpeg2 = enc2.jpeg,
+                .length1 = enc1.length,
+                .length2 = enc2.length,
+                .method = JPEGARCHIVE_METHOD_SSIM
+            };
+            jpegarchive_compare_output_t cmp_output = jpegarchive_compare(cmp_input);
+            if (cmp_output.error_code == JPEGARCHIVE_OK && cmp_output.metric > 0.999) {
+                printf("  PASSED: identical encodes have SSIM=%f\n", cmp_output.metric);
+            } else {
+                printf("  FAILED: compare error=%d, metric=%f\n", cmp_output.error_code, cmp_output.metric);
+                total_errors++;
+            }
+            jpegarchive_free_compare_output(&cmp_output);
+        } else {
+            printf("  FAILED: encode failed (err1=%d, err2=%d)\n", enc1.error_code, enc2.error_code);
+            total_errors++;
+        }
+        jpegarchive_free_encode_rgb_output(&enc1);
+        jpegarchive_free_encode_rgb_output(&enc2);
+
+        free(rgb);
+    }
+
+    printf("\n=== Testing jpegarchive_detect_subsampling ===\n");
+    {
+        // Test with known subsampling files if available
+        const char *sub_dir = "test-files/subsampling/";
+        // SUBSAMPLE_DEFAULT=0 (4:2:0), SUBSAMPLE_444=1, SUBSAMPLE_422=2
+        const char *sub_filenames[] = {"test_420.jpg", "test_444.jpg", "test_422.jpg"};
+        int sub_expected[] = {0, 1, 2};
+        const char *sub_labels[] = {"4:2:0", "4:4:4", "4:2:2"};
+        int num_sub = 3;
+
+        for (int i = 0; i < num_sub; i++) {
+            char path[512];
+            snprintf(path, sizeof(path), "%s%s", sub_dir, sub_filenames[i]);
+
+            struct stat st;
+            if (stat(path, &st) != 0) {
+                printf("Test: detect_subsampling on %s... SKIPPED (file not found)\n", sub_labels[i]);
+                continue;
+            }
+
+            printf("Test: detect_subsampling on %s file...\n", sub_labels[i]);
+            unsigned char *buf;
+            long size = read_file(path, &buf);
+            if (!size) {
+                printf("  FAILED: could not read file\n");
+                total_errors++;
+                continue;
+            }
+
+            int detected = jpegarchive_detect_subsampling(buf, size);
+            if (detected == sub_expected[i]) {
+                printf("  PASSED: detected %s (%d)\n", sub_labels[i], detected);
+            } else {
+                printf("  FAILED: expected %d, got %d\n", sub_expected[i], detected);
+                total_errors++;
+            }
+            free(buf);
+        }
+
+        // Test with NULL/invalid input
+        printf("Test: detect_subsampling with NULL input...\n");
+        int result = jpegarchive_detect_subsampling(NULL, 0);
+        if (result == 0) {  // SUBSAMPLE_DEFAULT = 0
+            printf("  PASSED: returned SUBSAMPLE_DEFAULT for NULL input\n");
+        } else {
+            printf("  FAILED: expected 0, got %d\n", result);
+            total_errors++;
+        }
+    }
+
+    printf("\n=== Testing jpegarchive_detect_quality ===\n");
+    {
+        // Test: Encode at known quality and verify detected quality is close
+        int test_qualities[] = {50, 75, 90, 95};
+        int num_q = sizeof(test_qualities) / sizeof(test_qualities[0]);
+
+        int w = 64, h = 64;
+        unsigned char *rgb = malloc(w * h * 3);
+        // Create a gradient image for better quantization table estimation
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int idx = (y * w + x) * 3;
+                rgb[idx + 0] = (unsigned char)(x * 4);
+                rgb[idx + 1] = (unsigned char)(y * 4);
+                rgb[idx + 2] = (unsigned char)((x + y) * 2);
+            }
+        }
+
+        for (int i = 0; i < num_q; i++) {
+            printf("Test: detect_quality on JPEG encoded at q=%d...\n", test_qualities[i]);
+
+            jpegarchive_encode_rgb_input_t enc_input = {
+                .rgb = rgb,
+                .width = w,
+                .height = h,
+                .quality = test_qualities[i],
+                .subsample = 0,  // SUBSAMPLE_DEFAULT
+                .progressive = 0
+            };
+            jpegarchive_encode_rgb_output_t enc_output = jpegarchive_encode_rgb(enc_input);
+
+            if (enc_output.error_code != JPEGARCHIVE_OK) {
+                printf("  FAILED: encode failed with error %d\n", enc_output.error_code);
+                total_errors++;
+                continue;
+            }
+
+            int detected = jpegarchive_detect_quality(enc_output.jpeg, enc_output.length);
+            int diff = abs(detected - test_qualities[i]);
+            // mozjpeg uses custom quantization tables, so estimated quality can differ
+            // significantly from the input quality parameter. Tolerance of 15 accounts for this.
+            if (diff <= 15) {
+                printf("  PASSED: detected q=%d (expected %d, diff=%d)\n", detected, test_qualities[i], diff);
+            } else {
+                printf("  FAILED: detected q=%d, expected %d (diff=%d exceeds tolerance of 15)\n",
+                       detected, test_qualities[i], diff);
+                total_errors++;
+            }
+            jpegarchive_free_encode_rgb_output(&enc_output);
+        }
+
+        // Test with existing test files
+        if (num_files > 0) {
+            printf("Test: detect_quality on existing test files (sanity check)...\n");
+            for (int i = 0; i < num_files && i < 3; i++) {
+                unsigned char *buf;
+                long size = read_file(test_files[i], &buf);
+                if (size) {
+                    int detected = jpegarchive_detect_quality(buf, size);
+                    if (detected >= 1 && detected <= 100) {
+                        printf("  %s: detected q=%d (valid range)\n", test_files[i], detected);
+                    } else {
+                        printf("  FAILED: %s: detected q=%d (out of range)\n", test_files[i], detected);
+                        total_errors++;
+                    }
+                    free(buf);
+                }
+            }
+        }
+
+        // Test with NULL input
+        printf("Test: detect_quality with NULL input...\n");
+        int result = jpegarchive_detect_quality(NULL, 0);
+        if (result == 95) {
+            printf("  PASSED: returned default 95 for NULL input\n");
+        } else {
+            printf("  FAILED: expected 95, got %d\n", result);
+            total_errors++;
+        }
+
+        free(rgb);
+    }
+
     printf("\n=== Test Summary ===\n");
     if (total_errors == 0) {
         printf("All tests PASSED!\n");
