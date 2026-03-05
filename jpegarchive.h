@@ -75,12 +75,38 @@ typedef struct {
     double metric;
 } jpegarchive_compare_output_t;
 
+// Input structure for jpegarchive_encode_rgb
+typedef struct {
+    const unsigned char *rgb;     // RGB pixel data (3 bytes per pixel, row-major)
+    int width;
+    int height;
+    int quality;                  // JPEG quality (1-100)
+    int subsample;                // SUBSAMPLE_DEFAULT(4:2:0), SUBSAMPLE_444, SUBSAMPLE_422
+    int progressive;              // 1 = progressive, 0 = baseline
+} jpegarchive_encode_rgb_input_t;
+
+// Output structure for jpegarchive_encode_rgb
+typedef struct {
+    jpegarchive_error_code_t error_code;
+    unsigned char *jpeg;
+    int64_t length;
+} jpegarchive_encode_rgb_output_t;
+
 // Function declarations
 jpegarchive_recompress_output_t jpegarchive_recompress(jpegarchive_recompress_input_t input);
 void jpegarchive_free_recompress_output(jpegarchive_recompress_output_t *output);
 
 jpegarchive_compare_output_t jpegarchive_compare(jpegarchive_compare_input_t input);
 void jpegarchive_free_compare_output(jpegarchive_compare_output_t *output);
+
+jpegarchive_encode_rgb_output_t jpegarchive_encode_rgb(jpegarchive_encode_rgb_input_t input);
+void jpegarchive_free_encode_rgb_output(jpegarchive_encode_rgb_output_t *output);
+
+// Detect subsampling from JPEG data (returns SUBSAMPLE_DEFAULT/444/422)
+int jpegarchive_detect_subsampling(const unsigned char *jpeg, int64_t length);
+
+// Estimate JPEG quality (1-100) from quantization tables
+int jpegarchive_detect_quality(const unsigned char *jpeg, int64_t length);
 
 #ifdef __cplusplus
 }

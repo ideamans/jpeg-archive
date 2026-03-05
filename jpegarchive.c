@@ -620,3 +620,138 @@ void jpegarchive_free_compare_output(jpegarchive_compare_output_t *output) {
     // Nothing to free for compare output
     (void)output;
 }
+
+jpegarchive_encode_rgb_output_t jpegarchive_encode_rgb(jpegarchive_encode_rgb_input_t input) {
+    jpegarchive_encode_rgb_output_t output;
+    memset(&output, 0, sizeof(output));
+
+    if (!input.rgb || input.width <= 0 || input.height <= 0) {
+        output.error_code = JPEGARCHIVE_INVALID_INPUT;
+        return output;
+    }
+
+    int quality = (input.quality > 0 && input.quality <= 100) ? input.quality : 95;
+    int subsample_method = input.subsample;
+    int progressive = input.progressive;
+
+    unsigned char *jpeg = NULL;
+    jpegarchive_error_code_t encode_error;
+    unsigned long jpegSize = safeEncodeJpeg(
+        &jpeg,
+        (unsigned char *)input.rgb,
+        input.width,
+        input.height,
+        JCS_RGB,
+        quality,
+        progressive,
+        1,  // optimize
+        subsample_method,
+        &encode_error
+    );
+
+    if (!jpegSize || !jpeg) {
+        output.error_code = encode_error ? encode_error : JPEGARCHIVE_UNKNOWN_ERROR;
+        return output;
+    }
+
+    output.error_code = JPEGARCHIVE_OK;
+    output.jpeg = jpeg;
+    output.length = (int64_t)jpegSize;
+    return output;
+}
+
+void jpegarchive_free_encode_rgb_output(jpegarchive_encode_rgb_output_t *output) {
+    if (output && output->jpeg) {
+        free(output->jpeg);
+        output->jpeg = NULL;
+        output->length = 0;
+    }
+}
+
+int jpegarchive_detect_subsampling(const unsigned char *jpeg, int64_t length) {
+    if (!jpeg || length <= 0) {
+        return SUBSAMPLE_DEFAULT;
+    }
+    return detect_original_subsampling(jpeg, (unsigned long)length);
+}
+
+// Standard JPEG luminance quantization table (quality 50)
+static const unsigned int std_luminance_quant_tbl[DCTSIZE2] = {
+    16,  11,  10,  16,  24,  40,  51,  61,
+    12,  12,  14,  19,  26,  58,  60,  55,
+    14,  13,  16,  24,  40,  57,  69,  56,
+    14,  17,  22,  29,  51,  87,  80,  62,
+    18,  22,  37,  56,  68, 109, 103,  77,
+    24,  35,  55,  64,  81, 104, 113,  92,
+    49,  64,  78,  87, 103, 121, 120, 101,
+    72,  92,  95,  98, 112, 100, 103,  99
+};
+
+// Standard JPEG chrominance quantization table (quality 50)
+static const unsigned int std_chrominance_quant_tbl[DCTSIZE2] = {
+    17,  18,  24,  47,  99,  99,  99,  99,
+    18,  21,  26,  66,  99,  99,  99,  99,
+    24,  26,  56,  99,  99,  99,  99,  99,
+    47,  66,  99,  99,  99,  99,  99,  99,
+    99,  99,  99,  99,  99,  99,  99,  99,
+    99,  99,  99,  99,  99,  99,  99,  99,
+    99,  99,  99,  99,  99,  99,  99,  99,
+    99,  99,  99,  99,  99,  99,  99,  99
+};
+
+int jpegarchive_detect_quality(const unsigned char *jpeg, int64_t length) {
+    if (!jpeg || length <= 0) {
+        return 95;
+    }
+
+    struct jpeg_decompress_struct cinfo;
+    struct jpegarchive_error_mgr jerr;
+
+    cinfo.err = jpeg_std_error(&jerr.pub);
+    jerr.pub.error_exit = jpegarchive_error_exit;
+
+    if (setjmp(jerr.setjmp_buffer)) {
+        jpeg_destroy_decompress(&cinfo);
+        return 95;
+    }
+
+    jpeg_create_decompress(&cinfo);
+    jpeg_mem_src(&cinfo, (unsigned char *)jpeg, (unsigned long)length);
+    jpeg_read_header(&cinfo, TRUE);
+
+    // Get luminance quantization table
+    JQUANT_TBL *qtbl = cinfo.quant_tbl_ptrs[0];
+    if (!qtbl) {
+        jpeg_destroy_decompress(&cinfo);
+        return 95;
+    }
+
+    // Estimate quality by computing average scaling factor relative to standard table
+    // IJG formula: scale = actual * 100 / standard
+    //   quality >= 50: scale = 200 - 2*quality  => quality = (200 - scale) / 2
+    //   quality <  50: scale = 5000 / quality    => quality = 5000 / scale
+    double scale_sum = 0;
+    int count = 0;
+    for (int i = 0; i < DCTSIZE2; i++) {
+        if (std_luminance_quant_tbl[i] > 0) {
+            scale_sum += (double)qtbl->quantval[i] * 100.0 / (double)std_luminance_quant_tbl[i];
+            count++;
+        }
+    }
+
+    jpeg_destroy_decompress(&cinfo);
+
+    if (count == 0) return 95;
+
+    double avg_scale = scale_sum / count;
+    int quality;
+    if (avg_scale <= 100.0) {
+        quality = (int)((200.0 - avg_scale) / 2.0 + 0.5);
+    } else {
+        quality = (int)(5000.0 / avg_scale + 0.5);
+    }
+
+    if (quality < 1) quality = 1;
+    if (quality > 100) quality = 100;
+    return quality;
+}
