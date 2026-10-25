@@ -168,6 +168,17 @@ jpeg-archive スクリプトは`ladon`または`parallel`を使用してマル�
 - 出力
   - なし
 
+## jpegarchive_recompress_rgb
+
+デコード済みの RGB 画素（リサイズ後など）を受け取り、jpegarchive_recompress と同じ二分探索で品質を選ぶ。
+**SSIM はその画素と比べ、エンコードは1回だけ**。一度 JPEG に書き出してから jpegarchive_recompress に
+渡すと、二重に圧縮されるうえ、画質の基準がその中間の JPEG になってしまう（rust-liblightfile6 の fit 経路が使う）。
+
+- 入力は rgb / width / height / min / max / loops / quality / method / target と subsample
+  （`SUBSAMPLE_DEFAULT`(4:2:0) / `SUBSAMPLE_444` / `SUBSAMPLE_422`。jpegarchive_encode_rgb と同じ値。元の JPEG が無いので KEEP は無い）
+- 処理済みの印（コメント）の確認と「入力より大きい」判定はしない（比べる入力ファイルが無い）。出力には同じ COM の印を入れる
+- 出力は jpegarchive_recompress_output_t で、jpegarchive_free_recompress_output で解放する
+
 ## jpegarchive_compare
 
 jpeg_compare.c を元に JPEG の SSIM 比較を行う。入力値がメモリになることと method が実質 SSIM だけのことを除き、その他のパラメータはデフォルト値を採用する。
