@@ -1156,6 +1156,85 @@ int main(int argc, char **argv) {
         free(rgb);
     }
 
+    printf("\n=== Testing jpegarchive_recompress_rgb ===\n");
+    {
+        // A smooth gradient with some detail, like a resized photo
+        int w = 320, h = 240;
+        unsigned char *rgb = malloc(w * h * 3);
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                unsigned char *p = rgb + (y * w + x) * 3;
+                p[0] = (unsigned char)(x * 255 / w);
+                p[1] = (unsigned char)(y * 255 / h);
+                p[2] = (unsigned char)(((x / 8 + y / 8) % 2) ? 200 : 60);
+            }
+        }
+
+        const jpegarchive_quality_t presets[] = {JPEGARCHIVE_QUALITY_LOW, JPEGARCHIVE_QUALITY_HIGH};
+        int qualities[2] = {0, 0};
+        for (int i = 0; i < 2; i++) {
+            jpegarchive_recompress_rgb_input_t in = {
+                .rgb = rgb, .width = w, .height = h,
+                .min = 32, .max = 96, .loops = 6,
+                .quality = presets[i], .method = JPEGARCHIVE_METHOD_SSIM,
+                .target = 0, .subsample = 0,
+            };
+            jpegarchive_recompress_output_t out = jpegarchive_recompress_rgb(in);
+            if (out.error_code != JPEGARCHIVE_OK || !out.jpeg) {
+                printf("  FAILED: preset %d returned error %d\n", i, out.error_code);
+                total_errors++;
+                continue;
+            }
+            qualities[i] = out.quality;
+            printf("  preset %d: quality=%d ssim=%f size=%lld\n", i, out.quality, out.metric, (long long)out.length);
+
+            // Marked as processed, like jpegarchive_recompress output
+            int marked = 0;
+            for (int64_t k = 0; k + 29 <= out.length; k++) {
+                if (memcmp(out.jpeg + k, "Compressed by jpeg-recompress", 29) == 0) { marked = 1; break; }
+            }
+            if (!marked) {
+                printf("  FAILED: output has no jpeg-recompress comment\n");
+                total_errors++;
+            }
+
+            // Dimensions are kept
+            struct jpeg_decompress_struct cinfo;
+            struct my_error_mgr jerr;
+            cinfo.err = jpeg_std_error(&jerr.pub);
+            jerr.pub.error_exit = my_error_exit;
+            if (setjmp(jerr.setjmp_buffer)) {
+                printf("  FAILED: output cannot be decoded\n");
+                total_errors++;
+                jpeg_destroy_decompress(&cinfo);
+            } else {
+                jpeg_create_decompress(&cinfo);
+                jpeg_mem_src(&cinfo, out.jpeg, out.length);
+                jpeg_read_header(&cinfo, TRUE);
+                if ((int)cinfo.image_width != w || (int)cinfo.image_height != h) {
+                    printf("  FAILED: dimensions %ux%u, expected %dx%d\n", cinfo.image_width, cinfo.image_height, w, h);
+                    total_errors++;
+                }
+                jpeg_destroy_decompress(&cinfo);
+            }
+            jpegarchive_free_recompress_output(&out);
+        }
+        if (qualities[0] && qualities[1] && qualities[1] <= qualities[0]) {
+            printf("  FAILED: high preset quality (%d) is not above low (%d)\n", qualities[1], qualities[0]);
+            total_errors++;
+        } else {
+            printf("  PASSED: high preset chose a higher quality than low\n");
+        }
+
+        jpegarchive_recompress_rgb_input_t bad = {.rgb = NULL, .width = w, .height = h};
+        jpegarchive_recompress_output_t bad_out = jpegarchive_recompress_rgb(bad);
+        if (bad_out.error_code != JPEGARCHIVE_INVALID_INPUT) {
+            printf("  FAILED: NULL pixels returned %d, expected INVALID_INPUT\n", bad_out.error_code);
+            total_errors++;
+        }
+        free(rgb);
+    }
+
     printf("\n=== Test Summary ===\n");
     if (total_errors == 0) {
         printf("All tests PASSED!\n");

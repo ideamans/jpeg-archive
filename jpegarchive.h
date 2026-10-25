@@ -51,6 +51,22 @@ typedef struct {
     jpegarchive_subsample_t subsample;  // Subsampling method
 } jpegarchive_recompress_input_t;
 
+// Input structure for jpegarchive_recompress_rgb: searches the quality for decoded pixels
+// (e.g. after a resize), so the metric is measured against the pixels themselves and the
+// image is encoded only once. No "already processed" or input size check is done.
+typedef struct {
+    const unsigned char *rgb;     // RGB pixel data (3 bytes per pixel, row-major)
+    int width;
+    int height;
+    int min;
+    int max;
+    int loops;
+    jpegarchive_quality_t quality;
+    jpegarchive_method_t method;
+    float target;  // Target metric value (0 = use quality preset)
+    int subsample; // SUBSAMPLE_DEFAULT(4:2:0), SUBSAMPLE_444, SUBSAMPLE_422 (same as encode_rgb)
+} jpegarchive_recompress_rgb_input_t;
+
 // Output structure for jpegarchive_recompress
 typedef struct {
     jpegarchive_error_code_t error_code;
@@ -95,6 +111,9 @@ typedef struct {
 // Function declarations
 jpegarchive_recompress_output_t jpegarchive_recompress(jpegarchive_recompress_input_t input);
 void jpegarchive_free_recompress_output(jpegarchive_recompress_output_t *output);
+
+// Output is freed with jpegarchive_free_recompress_output
+jpegarchive_recompress_output_t jpegarchive_recompress_rgb(jpegarchive_recompress_rgb_input_t input);
 
 jpegarchive_compare_output_t jpegarchive_compare(jpegarchive_compare_input_t input);
 void jpegarchive_free_compare_output(jpegarchive_compare_output_t *output);

@@ -284,6 +284,140 @@ static float get_target_from_preset(jpegarchive_quality_t preset, jpegarchive_me
     return 0.9999;
 }
 
+// Binary search for the lowest quality that meets the target metric.
+// `original` is RGB and `originalGray` its luma. On success the caller owns *compressedOut;
+// on error nothing is left allocated here (the caller still owns original/originalGray).
+static jpegarchive_error_code_t search_quality(unsigned char *original, unsigned char *originalGray, int width, int height,
+                                               int min, int max, int loops, float target, jpegarchive_method_t method,
+                                               int subsample_method, unsigned char **compressedOut,
+                                               unsigned long *compressedSizeOut, int *qualityOut, float *metricOut) {
+    unsigned char *compressed = NULL;
+    unsigned long compressedSize = 0;
+    int finalQuality = min;
+    float finalMetric = 0;
+
+    for (int attempt = loops - 1; attempt >= 0; --attempt) {
+        int quality = min + (max - min) / 2;
+
+        if (min == max) {
+            attempt = 0;
+        }
+
+        // Free previous compression if exists
+        if (compressed && attempt > 0) {
+            free(compressed);
+            compressed = NULL;
+        }
+
+        // Compress with current quality
+        int progressive = (attempt == 0) ? 1 : 0;
+        int optimize = (attempt == 0) ? 1 : 0;
+        jpegarchive_error_code_t encode_error;
+        compressedSize = safeEncodeJpeg(&compressed, original, width, height, JCS_RGB, quality, progressive, optimize, subsample_method, &encode_error);
+
+        if (!compressedSize) {
+            if (compressed) free(compressed);
+            return encode_error;
+        }
+
+        // Decode compressed for comparison
+        unsigned char *compressedGray = NULL;
+        int decodedWidth, decodedHeight;
+        jpegarchive_error_code_t decode_error;
+        long compressedGraySize = safeDecodeJpeg(compressed, compressedSize, &compressedGray, &decodedWidth, &decodedHeight, JCS_GRAYSCALE, &decode_error);
+
+        if (!compressedGraySize) {
+            free(compressed);
+            return decode_error;
+        }
+
+        // Calculate metric
+        float metric = 0;
+        if (method == JPEGARCHIVE_METHOD_SSIM) {
+            metric = iqa_ssim(originalGray, compressedGray, width, height, width, 0, 0);
+            // Check for SSIM calculation failure (returns INFINITY on error)
+            if (metric == INFINITY || metric != metric) {  // NaN check
+                free(compressed);
+                free(compressedGray);
+                return JPEGARCHIVE_MEMORY_ERROR;
+            }
+        }
+
+        finalQuality = quality;
+        finalMetric = metric;
+
+        // Adjust quality based on metric
+        if (metric < target) {
+            min = (quality + 1 < max) ? quality + 1 : max;
+        } else {
+            max = (quality - 1 > min) ? quality - 1 : min;
+        }
+
+        free(compressedGray);
+
+        // Keep compressed data on last iteration
+        if (attempt > 0) {
+            free(compressed);
+            compressed = NULL;
+        }
+    }
+
+    *compressedOut = compressed;
+    *compressedSizeOut = compressedSize;
+    *qualityOut = finalQuality;
+    *metricOut = finalMetric;
+    return JPEGARCHIVE_OK;
+}
+
+// Insert the "already processed" COM marker and the original metadata right after SOI + APP0
+static jpegarchive_error_code_t assemble_jpeg(const unsigned char *compressed, unsigned long compressedSize,
+                                              const unsigned char *metaBuf, unsigned int metaSize,
+                                              unsigned char **out, int64_t *outLength) {
+    const char *COMMENT = "Compressed by jpeg-recompress";
+
+    // Check APP0 marker
+    if (compressedSize < 6 || compressed[2] != 0xff || compressed[3] != 0xe0) {
+        return JPEGARCHIVE_UNKNOWN_ERROR;
+    }
+
+    int app0_len = (compressed[4] << 8) + compressed[5];
+
+    // Calculate total size: SOI+APP0 + COM + metadata + image data
+    unsigned long totalSize = 4 + app0_len + 4 + strlen(COMMENT) + metaSize + (compressedSize - 4 - app0_len);
+
+    unsigned char *finalJpeg = malloc(totalSize);
+    if (!finalJpeg) {
+        return JPEGARCHIVE_MEMORY_ERROR;
+    }
+
+    unsigned char *ptr = finalJpeg;
+
+    // Copy SOI and APP0
+    memcpy(ptr, compressed, 4 + app0_len);
+    ptr += 4 + app0_len;
+
+    // Add COM marker
+    *ptr++ = 0xff;
+    *ptr++ = 0xfe;
+    *ptr++ = 0x00;
+    *ptr++ = strlen(COMMENT) + 2;
+    memcpy(ptr, COMMENT, strlen(COMMENT));
+    ptr += strlen(COMMENT);
+
+    // Add original metadata
+    if (metaSize > 0) {
+        memcpy(ptr, metaBuf, metaSize);
+        ptr += metaSize;
+    }
+
+    // Add remaining image data
+    memcpy(ptr, compressed + 4 + app0_len, compressedSize - 4 - app0_len);
+
+    *out = finalJpeg;
+    *outLength = totalSize;
+    return JPEGARCHIVE_OK;
+}
+
 jpegarchive_recompress_output_t jpegarchive_recompress(jpegarchive_recompress_input_t input) {
     jpegarchive_recompress_output_t output;
     memset(&output, 0, sizeof(output));
@@ -385,157 +519,89 @@ jpegarchive_recompress_output_t jpegarchive_recompress(jpegarchive_recompress_in
     unsigned long compressedSize = 0;
     int finalQuality = min;
     float finalMetric = 0;
-    
-    for (int attempt = loops - 1; attempt >= 0; --attempt) {
-        int quality = min + (max - min) / 2;
-        
-        if (min == max) {
-            attempt = 0;
-        }
-        
-        // Free previous compression if exists
-        if (compressed && attempt > 0) {
-            free(compressed);
-            compressed = NULL;
-        }
-        
-        // Compress with current quality
-        int progressive = (attempt == 0) ? 1 : 0;
-        int optimize = (attempt == 0) ? 1 : 0;
-        jpegarchive_error_code_t encode_error;
-        compressedSize = safeEncodeJpeg(&compressed, original, width, height, JCS_RGB, quality, progressive, optimize, subsample_method, &encode_error);
-        
-        if (!compressedSize) {
-            free(original);
-            free(originalGray);
-            if (compressed) free(compressed);
-            if (metaBuf) free(metaBuf);
-            output.error_code = encode_error;
-            return output;
-        }
-        
-        // Decode compressed for comparison
-        unsigned char *compressedGray = NULL;
-        jpegarchive_error_code_t decode_error2;
-        long compressedGraySize = safeDecodeJpeg(compressed, compressedSize, &compressedGray, &width, &height, JCS_GRAYSCALE, &decode_error2);
-        
-        if (!compressedGraySize) {
-            free(original);
-            free(originalGray);
-            free(compressed);
-            if (metaBuf) free(metaBuf);
-            output.error_code = decode_error2;
-            return output;
-        }
-        
-        // Calculate metric
-        float metric = 0;
-        if (input.method == JPEGARCHIVE_METHOD_SSIM) {
-            metric = iqa_ssim(originalGray, compressedGray, width, height, width, 0, 0);
-            // Check for SSIM calculation failure (returns INFINITY on error)
-            if (metric == INFINITY || metric != metric) {  // NaN check
-                free(compressed);
-                free(compressedGray);
-                free(original);
-                free(originalGray);
-                if (metaBuf) free(metaBuf);
-                output.error_code = JPEGARCHIVE_MEMORY_ERROR;
-                return output;
-            }
-        }
-
-        finalQuality = quality;
-        finalMetric = metric;
-        
-        // Adjust quality based on metric
-        if (metric < target) {
-            min = (quality + 1 < max) ? quality + 1 : max;
-        } else {
-            max = (quality - 1 > min) ? quality - 1 : min;
-        }
-        
-        free(compressedGray);
-        
-        // Keep compressed data on last iteration
-        if (attempt > 0) {
-            free(compressed);
-            compressed = NULL;
-        }
+    jpegarchive_error_code_t search_error = search_quality(original, originalGray, width, height, min, max, loops, target, input.method, subsample_method, &compressed, &compressedSize, &finalQuality, &finalMetric);
+    free(original);
+    free(originalGray);
+    if (search_error != JPEGARCHIVE_OK) {
+        if (metaBuf) free(metaBuf);
+        output.error_code = search_error;
+        return output;
     }
-    
+
     // Check if output is larger than input
     if (compressedSize >= (unsigned long)input.length) {
-        free(original);
-        free(originalGray);
         free(compressed);
         if (metaBuf) free(metaBuf);
         output.error_code = JPEGARCHIVE_NOT_SUITABLE;
         return output;
     }
-    
+
     // Build complete JPEG with metadata and comment
-    const char *COMMENT = "Compressed by jpeg-recompress";
-    
-    // Check APP0 marker
-    if (compressed[2] != 0xff || compressed[3] != 0xe0) {
-        free(original);
-        free(originalGray);
-        free(compressed);
-        if (metaBuf) free(metaBuf);
-        output.error_code = JPEGARCHIVE_UNKNOWN_ERROR;
+    output.error_code = assemble_jpeg(compressed, compressedSize, metaBuf, metaSize, &output.jpeg, &output.length);
+    free(compressed);
+    if (metaBuf) free(metaBuf);
+    if (output.error_code != JPEGARCHIVE_OK) {
         return output;
     }
-    
-    int app0_len = (compressed[4] << 8) + compressed[5];
-    
-    // Calculate total size: SOI+APP0 + COM + metadata + image data
-    unsigned long totalSize = 4 + app0_len + 4 + strlen(COMMENT) + metaSize + (compressedSize - 4 - app0_len);
-    
-    unsigned char *finalJpeg = malloc(totalSize);
-    if (!finalJpeg) {
-        free(original);
-        free(originalGray);
-        free(compressed);
-        if (metaBuf) free(metaBuf);
+    output.quality = finalQuality;
+    output.metric = finalMetric;
+
+    return output;
+}
+
+jpegarchive_recompress_output_t jpegarchive_recompress_rgb(jpegarchive_recompress_rgb_input_t input) {
+    jpegarchive_recompress_output_t output;
+    memset(&output, 0, sizeof(output));
+
+    // Validate input
+    if (!input.rgb || input.width <= 0 || input.height <= 0) {
+        output.error_code = JPEGARCHIVE_INVALID_INPUT;
+        return output;
+    }
+
+    int min = (input.min > 0) ? input.min : 40;
+    int max = (input.max > 0) ? input.max : 95;
+    int loops = (input.loops > 0) ? input.loops : 6;
+    if (min > max) {
+        output.error_code = JPEGARCHIVE_INVALID_INPUT;
+        return output;
+    }
+
+    float target = (input.target > 0) ? input.target : get_target_from_preset(input.quality, input.method);
+
+    int subsample_method = input.subsample;
+    if (subsample_method != SUBSAMPLE_444 && subsample_method != SUBSAMPLE_422) {
+        subsample_method = SUBSAMPLE_DEFAULT;
+    }
+
+    // The pixels are the reference: there is no previous JPEG generation to compare against,
+    // and no "already processed" mark or input size to check
+    unsigned char *originalGray = NULL;
+    long originalGraySize = grayscale((unsigned char *)input.rgb, &originalGray, input.width, input.height);
+    if (!originalGraySize) {
         output.error_code = JPEGARCHIVE_MEMORY_ERROR;
         return output;
     }
-    
-    unsigned char *ptr = finalJpeg;
-    
-    // Copy SOI and APP0
-    memcpy(ptr, compressed, 4 + app0_len);
-    ptr += 4 + app0_len;
-    
-    // Add COM marker
-    *ptr++ = 0xff;
-    *ptr++ = 0xfe;
-    *ptr++ = 0x00;
-    *ptr++ = strlen(COMMENT) + 2;
-    memcpy(ptr, COMMENT, strlen(COMMENT));
-    ptr += strlen(COMMENT);
-    
-    // Add original metadata
-    if (metaSize > 0) {
-        memcpy(ptr, metaBuf, metaSize);
-        ptr += metaSize;
+
+    unsigned char *compressed = NULL;
+    unsigned long compressedSize = 0;
+    int finalQuality = min;
+    float finalMetric = 0;
+    jpegarchive_error_code_t search_error = search_quality((unsigned char *)input.rgb, originalGray, input.width, input.height, min, max, loops, target, input.method, subsample_method, &compressed, &compressedSize, &finalQuality, &finalMetric);
+    free(originalGray);
+    if (search_error != JPEGARCHIVE_OK) {
+        output.error_code = search_error;
+        return output;
     }
-    
-    // Add remaining image data
-    memcpy(ptr, compressed + 4 + app0_len, compressedSize - 4 - app0_len);
-    
-    // Prepare output
-    output.error_code = JPEGARCHIVE_OK;
-    output.jpeg = finalJpeg;
-    output.length = totalSize;
+
+    output.error_code = assemble_jpeg(compressed, compressedSize, NULL, 0, &output.jpeg, &output.length);
+    free(compressed);
+    if (output.error_code != JPEGARCHIVE_OK) {
+        return output;
+    }
     output.quality = finalQuality;
     output.metric = finalMetric;
-    
-    free(compressed);
-    free(original);
-    free(originalGray);
-    if (metaBuf) free(metaBuf);
-    
+
     return output;
 }
 
